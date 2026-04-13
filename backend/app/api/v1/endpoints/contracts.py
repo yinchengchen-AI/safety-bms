@@ -374,6 +374,8 @@ def delete_contract(
         raise NotFoundError("合同")
     if not check_data_scope(contract, current_user):
         raise PermissionDeniedError()
+    if contract.status != ContractStatus.DRAFT:
+        raise BusinessError("只有草稿状态的合同可以删除")
     crud_contract.soft_delete(db, contract_id=contract_id)
     return {"message": "删除成功"}
 

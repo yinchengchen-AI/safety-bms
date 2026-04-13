@@ -202,9 +202,11 @@ const Contracts: React.FC = () => {
         {r.status === 'draft' && (
           <PermissionButton permission="contract:update" type="link" size="small" onClick={() => handleEdit(r)}>编辑</PermissionButton>
         )}
-        <Popconfirm title="确认删除？" onConfirm={() => deleteContract(r.id)}>
-          <PermissionButton permission="contract:delete" type="link" danger size="small">删除</PermissionButton>
-        </Popconfirm>
+        {r.status === 'draft' && (
+          <Popconfirm title="确认删除？" onConfirm={() => deleteContract(r.id)}>
+            <PermissionButton permission="contract:delete" type="link" danger size="small">删除</PermissionButton>
+          </Popconfirm>
+        )}
         {r.status === 'draft' && (
           <PermissionButton permission="contract:update" size="small" onClick={() => updateStatus({ id: r.id, status: 'review' })}>提交审核</PermissionButton>
         )}
