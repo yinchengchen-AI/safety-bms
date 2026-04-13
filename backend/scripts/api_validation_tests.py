@@ -52,6 +52,49 @@ def create_customer() -> int:
     return r.json()["id"]
 
 
+def ensure_test_template() -> int:
+    """确保存在一个可用的合同模板，没有则自动创建并上传一个最小 docx 文件。"""
+    r = session.get(f"{BASE_URL}/contract-templates?page=1&page_size=1")
+    if r.status_code == 200 and r.json().get("items"):
+        return r.json()["items"][0]["id"]
+
+    # 创建一个最小 docx 文件
+    from docx import Document
+    doc = Document()
+    doc.add_paragraph("合同编号：{{contract_no}}")
+    doc.add_paragraph("客户名称：{{customer_name}}")
+    doc_path = "/tmp/test_contract_template.docx"
+    doc.save(doc_path)
+
+    # 由于 create_contract_template API 要求 file_url NOT NULL，我们先用 SQL 插入记录
+    import psycopg2, os
+    conn = psycopg2.connect(
+        host=os.getenv("DB_HOST", "localhost"),
+        port=os.getenv("DB_PORT", "5432"),
+        dbname=os.getenv("DB_NAME", "safety_bms"),
+        user=os.getenv("DB_USER", "postgres"),
+        password=os.getenv("DB_PASSWORD", "postgres"),
+    )
+    cur = conn.cursor()
+    cur.execute(
+        "INSERT INTO contract_templates (name, service_type, file_url, is_default, created_by, created_at, updated_at) VALUES (%s, %s, %s, %s, %s, NOW(), NOW()) RETURNING id",
+        ("测试模板", "EVALUATION", "contract-templates/test.docx", False, 1),
+    )
+    template_id = cur.fetchone()[0]
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    # 上传模板文件
+    with open(doc_path, "rb") as f:
+        upload_r = session.post(
+            f"{BASE_URL}/contract-templates/{template_id}/upload",
+            files={"file": ("test_contract_template.docx", f, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")},
+        )
+    assert upload_r.status_code == 200, f"上传测试模板文件失败: {upload_r.text}"
+    return template_id
+
+
 def create_contract(customer_id: int, total_amount: float = 10000, template_id: int = None):
     payload = {
         "contract_no": f"C-{date.today().isoformat()}-{total_amount}-{str(uuid.uuid4())[:4]}",
@@ -266,17 +309,19 @@ def main():
     test_weak_password_rejected()
 
     customer_id = create_customer()
-    contract_id = create_contract(customer_id, total_amount=10000)
+    template_id = ensure_test_template()
+
+    contract_id = create_contract(customer_id, total_amount=10000, template_id=template_id)
     test_contract_status_machine(contract_id)  # 内部会 activate_contract
     test_invoice_amount_limit(contract_id)
 
-    contract_id2 = create_contract(customer_id, total_amount=10000)
+    contract_id2 = create_contract(customer_id, total_amount=10000, template_id=template_id)
     activate_contract(contract_id2)
     test_payment_amount_limit(contract_id2)
 
     test_contract_audit_to_sign_flow(customer_id)
 
-    contract_id3 = create_contract(customer_id, total_amount=100)
+    contract_id3 = create_contract(customer_id, total_amount=100, template_id=template_id)
     activate_contract(contract_id3)
 
     print("=" * 50)

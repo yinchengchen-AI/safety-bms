@@ -29,7 +29,7 @@ class ContractBase(BaseModel):
 
 
 class ContractCreate(ContractBase):
-    pass
+    template_id: Optional[int] = None
 
 
 class ContractUpdate(BaseModel):
