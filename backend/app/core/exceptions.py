@@ -1,3 +1,4 @@
+from decimal import Decimal
 from fastapi import HTTPException, status
 
 
@@ -18,16 +19,16 @@ class DuplicateError(BusinessError):
 
 
 class InvoiceAmountExceededError(BusinessError):
-    def __init__(self, available: float, requested: float):
+    def __init__(self, available: Decimal, requested: Decimal):
         super().__init__(
-            f"开票金额({requested:.2f})超过合同可开票余额({available:.2f})"
+            f"开票金额({float(requested):.2f})超过合同可开票余额({float(available):.2f})"
         )
 
 
 class PaymentAmountExceededError(BusinessError):
-    def __init__(self, available: float, requested: float):
+    def __init__(self, available: Decimal, requested: Decimal):
         super().__init__(
-            f"收款金额({requested:.2f})超过合同可收款余额({available:.2f})"
+            f"收款金额({float(requested):.2f})超过合同可收款余额({float(available):.2f})"
         )
 
 

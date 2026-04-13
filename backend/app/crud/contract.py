@@ -1,4 +1,5 @@
 from typing import List, Optional, Tuple
+from decimal import Decimal
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 
@@ -77,21 +78,21 @@ class CRUDContract(CRUDBase[Contract, ContractCreate, ContractUpdate]):
         db.refresh(db_obj)
         return db_obj
 
-    def get_invoiced_amount(self, db: Session, *, contract_id: int) -> float:
+    def get_invoiced_amount(self, db: Session, *, contract_id: int) -> Decimal:
         result = (
             db.query(func.coalesce(func.sum(Invoice.amount), 0))
             .filter(Invoice.contract_id == contract_id)
             .scalar()
         )
-        return float(result)
+        return Decimal(str(result))
 
-    def get_received_amount(self, db: Session, *, contract_id: int) -> float:
+    def get_received_amount(self, db: Session, *, contract_id: int) -> Decimal:
         result = (
             db.query(func.coalesce(func.sum(Payment.amount), 0))
             .filter(Payment.contract_id == contract_id)
             .scalar()
         )
-        return float(result)
+        return Decimal(str(result))
 
     def soft_delete(self, db: Session, *, contract_id: int) -> None:
         from datetime import datetime, timezone

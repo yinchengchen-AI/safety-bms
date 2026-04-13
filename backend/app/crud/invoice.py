@@ -13,7 +13,7 @@ class CRUDInvoice(CRUDBase[Invoice, InvoiceCreate, InvoiceUpdate]):
     def create(self, db: Session, *, obj_in: InvoiceCreate, applied_by: int | None = None) -> Invoice:
         data = obj_in.model_dump()
         # 自动计算税额
-        tax_amount = (data["amount"] * data["tax_rate"]).quantize(Decimal("0.01"))
+        tax_amount = (data["amount"] * data["tax_rate"] / (Decimal("1") + data["tax_rate"])).quantize(Decimal("0.01"))
         db_obj = Invoice(**data, tax_amount=tax_amount, applied_by=applied_by)
         db.add(db_obj)
         db.commit()

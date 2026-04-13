@@ -1,8 +1,6 @@
-from decimal import Decimal
 from sqlalchemy.orm import Session
 
 from app.crud.invoice import crud_invoice
-from app.crud.contract import crud_contract
 from app.core.exceptions import InvoiceAmountExceededError, NotFoundError, ContractStatusError
 from app.core.constants import ContractStatus
 from app.schemas.invoice import InvoiceCreate
@@ -24,13 +22,16 @@ class InvoiceService:
         if contract.status != ContractStatus.ACTIVE:
             raise ContractStatusError("只有生效状态的合同才能开票")
 
-        # 2. 校验开票金额不超可开票余额
+        # 2. 对已有发票加锁，防止并发超开
+        db.query(Invoice).filter(Invoice.contract_id == contract.id).with_for_update().all()
+
+        # 3. 校验开票金额不超可开票余额
         already_invoiced = crud_invoice.get_sum_by_contract(db, contract_id=contract.id)
-        available = Decimal(str(contract.total_amount)) - already_invoiced
+        available = contract.total_amount - already_invoiced
         if obj_in.amount > available:
             raise InvoiceAmountExceededError(
-                available=float(available),
-                requested=float(obj_in.amount),
+                available=available,
+                requested=obj_in.amount,
             )
 
         return crud_invoice.create(db, obj_in=obj_in, applied_by=applied_by)

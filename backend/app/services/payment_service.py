@@ -3,10 +3,11 @@ from datetime import date
 from sqlalchemy.orm import Session
 
 from app.crud.payment import crud_payment
-from app.core.exceptions import NotFoundError, PaymentAmountExceededError
+from app.core.exceptions import NotFoundError, PaymentAmountExceededError, BusinessError
 from app.schemas.payment import PaymentCreate, ContractReceivable
 from app.models.payment import Payment
 from app.models.contract import Contract
+from app.models.invoice import Invoice
 
 
 class PaymentService:
@@ -20,13 +21,29 @@ class PaymentService:
         if not contract:
             raise NotFoundError("合同")
 
+        # 对已有收款记录加锁，防止并发超收
+        db.query(Payment).filter(Payment.contract_id == contract.id).with_for_update().all()
+
         received = crud_payment.get_sum_by_contract(db, contract_id=contract.id)
         if received + obj_in.amount > contract.total_amount:
             available = contract.total_amount - received
             raise PaymentAmountExceededError(
-                available=float(available),
-                requested=float(obj_in.amount),
+                available=available,
+                requested=obj_in.amount,
             )
+
+        # 若关联了发票，校验收款不超发票金额
+        if obj_in.invoice_id:
+            invoice = db.query(Invoice).filter(Invoice.id == obj_in.invoice_id).first()
+            if not invoice:
+                raise NotFoundError("发票")
+            if invoice.contract_id != contract.id:
+                raise BusinessError("关联发票不属于该合同")
+            paid_for_invoice = crud_payment.get_sum_by_invoice(db, invoice_id=invoice.id)
+            if paid_for_invoice + obj_in.amount > invoice.amount:
+                raise BusinessError(
+                    f"收款金额({float(obj_in.amount):.2f})超过关联发票可收余额({float(invoice.amount - paid_for_invoice):.2f})"
+                )
 
         return crud_payment.create(db, obj_in=obj_in, created_by=created_by)
 

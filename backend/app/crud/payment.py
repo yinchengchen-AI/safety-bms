@@ -42,6 +42,14 @@ class CRUDPayment(CRUDBase[Payment, PaymentCreate, PaymentUpdate]):
         )
         return Decimal(str(result))
 
+    def get_sum_by_invoice(self, db: Session, *, invoice_id: int) -> Decimal:
+        result = (
+            db.query(func.coalesce(func.sum(Payment.amount), 0))
+            .filter(Payment.invoice_id == invoice_id)
+            .scalar()
+        )
+        return Decimal(str(result))
+
     def get_sums_by_contract_ids(self, db: Session, *, contract_ids: List[int]) -> dict[int, Decimal]:
         results = (
             db.query(Payment.contract_id, func.coalesce(func.sum(Payment.amount), 0).label("total"))
