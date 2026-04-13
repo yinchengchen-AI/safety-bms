@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.schemas.contract import (
     ContractCreate, ContractUpdate, ContractOut, ContractListOut, ContractStatusUpdate,
-    ContractSignRequest,
+    ContractSignRequest, ContractUploadSignedRequest,
 )
 from app.schemas.common import PageResponse, ResponseMsg
 from app.crud.contract import crud_contract
@@ -376,3 +376,67 @@ def delete_contract(
         raise PermissionDeniedError()
     crud_contract.soft_delete(db, contract_id=contract_id)
     return {"message": "删除成功"}
+
+
+@router.post("/{contract_id}/upload-signed", response_model=ContractOut)
+def upload_signed_contract(
+    contract_id: int,
+    body: ContractUploadSignedRequest,
+    current_user: User = Depends(require_permissions(PermissionCode.CONTRACT_SIGN)),
+    db: Session = Depends(get_db),
+):
+    contract = (
+        db.query(Contract)
+        .filter(Contract.id == contract_id, Contract.is_deleted == False)
+        .with_for_update()
+        .first()
+    )
+    if not contract:
+        raise NotFoundError("合同")
+    if not check_data_scope(contract, current_user):
+        raise PermissionDeniedError()
+    if contract.status == ContractStatus.SIGNED:
+        raise BusinessError("合同已签订")
+    if contract.status != ContractStatus.ACTIVE:
+        raise BusinessError("只有生效中的合同才能确认签订")
+    if not contract.draft_doc_url:
+        raise BusinessError("合同草稿不存在，无法确认签订")
+
+    old_status = contract.status.value
+    now = datetime.now(timezone.utc)
+    update_fields = {
+        "status": ContractStatus.SIGNED,
+        "signed_at": now,
+        "final_pdf_url": body.file_url,
+    }
+    if contract.sign_date is None:
+        update_fields["sign_date"] = now.date()
+
+    updated = crud_contract.update(db, db_obj=contract, obj_in=update_fields)
+
+    change = ContractChange(
+        contract_id=contract.id,
+        changed_by=current_user.id,
+        change_summary=f"状态变更: {old_status} → signed (上传盖章版)",
+        before_status=old_status,
+        after_status="signed",
+        remark="",
+    )
+    db.add(change)
+    db.commit()
+    db.refresh(updated)
+
+    creator = db.query(User).filter(User.id == contract.created_by).first()
+    if creator and creator.id != current_user.id:
+        notification_service.create(
+            db,
+            user_id=creator.id,
+            title="合同签订完成",
+            content=f"合同 {contract.title} 已通过上传盖章版完成签订。",
+        )
+
+    result = ContractOut.model_validate(updated)
+    result.customer_name = updated.customer.name if updated.customer else None
+    result.invoiced_amount = crud_contract.get_invoiced_amount(db, contract_id=contract_id)
+    result.received_amount = crud_contract.get_received_amount(db, contract_id=contract_id)
+    return result
