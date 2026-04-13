@@ -1,155 +1,402 @@
 import React from 'react'
-import { Row, Col, Card, Statistic, Spin, Tag } from 'antd'
-import { FileTextOutlined, DollarOutlined, ExclamationCircleOutlined, RiseOutlined } from '@ant-design/icons'
+import { Row, Col, Card, Statistic, Spin, Tag, Empty } from 'antd'
+import {
+  FileTextOutlined,
+  DollarOutlined,
+  ExclamationCircleOutlined,
+  RiseOutlined,
+  UserOutlined,
+  ToolOutlined,
+} from '@ant-design/icons'
 import { Line, Pie, Column } from '@ant-design/charts'
 import { useGetDashboardStatsQuery } from '@/store/api/dashboardApi'
-import { formatAmount, ContractStatusLabels, ServiceOrderStatusLabels } from '@/utils/constants'
+import {
+  formatAmount,
+  ContractStatusLabels,
+  ServiceOrderStatusLabels,
+  ServiceTypeLabels,
+} from '@/utils/constants'
+
+interface KPICardProps {
+  title: string
+  value: number | string
+  prefix: React.ReactNode
+  gradient: string
+  suffix?: string
+  formatter?: (v: number | string) => string
+}
+
+const KPICard: React.FC<KPICardProps> = ({
+  title,
+  value,
+  prefix,
+  gradient,
+  suffix,
+  formatter,
+}) => (
+  <Card
+    bodyStyle={{ padding: 20 }}
+    style={{
+      borderRadius: 12,
+      background: gradient,
+      border: 'none',
+      color: '#fff',
+    }}
+  >
+    <Statistic
+      title={<span style={{ color: 'rgba(255,255,255,0.85)', fontSize: 14 }}>{title}</span>}
+      value={value}
+      prefix={<span style={{ color: '#fff', fontSize: 18, marginRight: 8 }}>{prefix}</span>}
+      suffix={suffix ? <span style={{ color: 'rgba(255,255,255,0.85)', fontSize: 14 }}>{suffix}</span> : undefined}
+      valueStyle={{ color: '#fff', fontSize: 24, fontWeight: 700 }}
+      formatter={(v) => (formatter ? formatter(v as number) : String(v))}
+    />
+  </Card>
+)
 
 const Dashboard: React.FC = () => {
   const { data: stats, isLoading } = useGetDashboardStatsQuery()
 
-  if (isLoading) return <div style={{ textAlign: 'center', padding: 80 }}><Spin size="large" /></div>
+  if (isLoading) {
+    return (
+      <div style={{ textAlign: 'center', padding: 120 }}>
+        <Spin size="large" />
+      </div>
+    )
+  }
   if (!stats) return null
 
-  // 月度趋势折线图数据
-  const invoiceTrend = (stats.monthly_invoice_trend || []).map((d) => ({
-    month: String(d.month),
+  // 月度开票/收款趋势
+  const invoiceTrend = (stats.monthly_invoice_trend || []).map((d: any) => ({
+    month: `${d.month}月`,
     value: Number(d.total || 0),
-    category: '开票金额' as const,
+    type: '开票金额',
   }))
-  const paymentTrend = (stats.monthly_payment_trend || []).map((d) => ({
-    month: String(d.month),
+  const paymentTrend = (stats.monthly_payment_trend || []).map((d: any) => ({
+    month: `${d.month}月`,
     value: Number(d.total || 0),
-    category: '收款金额' as const,
+    type: '收款金额',
   }))
   const trendData = [...invoiceTrend, ...paymentTrend]
 
-  // 合同状态分布饼图
-  const contractPieData = (stats.contract_status_distribution || []).map((d) => ({
-    type: ContractStatusLabels[d.status as keyof typeof ContractStatusLabels] || d.status,
+  // 合同状态分布
+  const contractPieData = (stats.contract_status_distribution || []).map((d: any) => ({
+    name: ContractStatusLabels[d.status as keyof typeof ContractStatusLabels] || d.status,
     value: Number(d.count),
   }))
 
-  // 服务工单状态分布柱状图
-  const serviceBarData = (stats.service_status_distribution || []).map((d) => ({
-    status: ServiceOrderStatusLabels[d.status as keyof typeof ServiceOrderStatusLabels] || d.status,
+  // 服务工单状态分布
+  const serviceBarData = (stats.service_status_distribution || []).map((d: any) => ({
+    name: ServiceOrderStatusLabels[d.status as keyof typeof ServiceOrderStatusLabels] || d.status,
+    value: Number(d.count),
+  }))
+
+  // 客户增长趋势
+  const customerGrowthData = ((stats as any).customer_growth_trend || []).map((d: any) => ({
+    month: `${d.month}月`,
     count: Number(d.count),
   }))
 
+  // 合同金额按服务类型分布
+  const contractAmountByServiceData = ((stats as any).contract_amount_by_service_type || []).map(
+    (d: any) => ({
+      name: ServiceTypeLabels[d.service_type as keyof typeof ServiceTypeLabels] || d.service_type,
+      value: Number(d.total_amount),
+    })
+  )
+
+  // 员工业绩排行
+  const topPerformers = (stats as any).top_performers || []
+
+  // 逾期合同
+  const overdueContracts = (stats.overdue_contracts || []).slice(0, 5)
+
+  const trendConfig = {
+    data: trendData,
+    xField: 'month',
+    yField: 'value',
+    seriesField: 'type',
+    smooth: true,
+    color: ['#1890ff', '#52c41a'],
+    legend: { position: 'top-right' as const },
+    yAxis: {
+      title: { text: '金额（万）' },
+      labelFormatter: (v: number) => `¥${(v / 10000).toFixed(1)}万`,
+    },
+    xAxis: { title: { text: '月份' } },
+    tooltip: {
+      items: [
+        (d: any) => ({
+          name: d.type,
+          value: formatAmount(d.value),
+        }),
+      ],
+    },
+  }
+
+  const pieConfig = {
+    data: contractPieData,
+    angleField: 'value',
+    colorField: 'name',
+    innerRadius: 0.5,
+    legend: {
+      color: { position: 'bottom' as const, layout: { justifyContent: 'center' } },
+    },
+    label: {
+      text: (d: any) => `${d.name}\n${d.value}个`,
+      style: { fontSize: 12 },
+    },
+    tooltip: {
+      items: [
+        (d: any) => ({
+          name: d.name,
+          value: `${d.value}个`,
+        }),
+      ],
+    },
+  }
+
+  const serviceBarConfig = {
+    data: serviceBarData,
+    xField: 'name',
+    yField: 'value',
+    color: '#1890ff',
+    xAxis: { title: { text: '状态' } },
+    yAxis: { title: { text: '数量（个）' } },
+    label: {
+      text: (d: any) => `${d.value}个`,
+      style: { fill: '#fff' },
+    },
+    tooltip: {
+      items: [
+        (d: any) => ({
+          name: '工单数量',
+          value: `${d.value}个`,
+        }),
+      ],
+    },
+    style: { radiusTopLeft: 4, radiusTopRight: 4 },
+  }
+
+  const amountByServiceConfig = {
+    data: contractAmountByServiceData,
+    xField: 'name',
+    yField: 'value',
+    color: '#722ed1',
+    xAxis: {
+      title: { text: '服务类型' },
+      labelAutoRotate: true,
+    },
+    yAxis: {
+      title: { text: '金额（万）' },
+      labelFormatter: (v: number) => `¥${(v / 10000).toFixed(1)}万`,
+    },
+    label: {
+      text: (d: any) => `¥${(d.value / 10000).toFixed(1)}万`,
+      style: { fill: '#fff' },
+    },
+    tooltip: {
+      items: [
+        (d: any) => ({
+          name: '合同金额',
+          value: formatAmount(d.value),
+        }),
+      ],
+    },
+    style: { radiusTopLeft: 4, radiusTopRight: 4 },
+  }
+
+  const customerGrowthConfig = {
+    data: customerGrowthData,
+    xField: 'month',
+    yField: 'count',
+    smooth: true,
+    color: '#13c2c2',
+    areaStyle: { fill: 'rgba(19, 194, 194, 0.15)' },
+    xAxis: { title: { text: '月份' } },
+    yAxis: { title: { text: '新增客户数（个）' }, labelFormatter: (v: number) => `${v} 个` },
+    tooltip: {
+      items: [
+        (d: any) => ({
+          name: '新增客户数',
+          value: `${d.count} 个`,
+        }),
+      ],
+    },
+  }
+
   return (
-    <div>
-      {/* 顶部统计卡片 */}
+    <div style={{ paddingBottom: 24 }}>
+      {/* KPI 卡片 */}
       <Row gutter={[16, 16]}>
-        <Col span={6}>
-          <Card>
-            <Statistic
-              title="本月开票金额"
-              value={stats.monthly_invoice_amount || 0}
-              precision={2}
-              prefix={<FileTextOutlined />}
-              formatter={(v) => formatAmount(Number(v))}
-            />
-          </Card>
+        <Col span={4}>
+          <KPICard
+            title="本月开票金额"
+            value={stats.monthly_invoice_amount || 0}
+            prefix={<FileTextOutlined />}
+            gradient="linear-gradient(135deg, #1890ff 0%, #36cfc9 100%)"
+            formatter={(v) => formatAmount(Number(v))}
+          />
         </Col>
-        <Col span={6}>
-          <Card>
-            <Statistic
-              title="本月收款金额"
-              value={stats.monthly_payment_amount || 0}
-              precision={2}
-              prefix={<DollarOutlined />}
-              formatter={(v) => formatAmount(Number(v))}
-            />
-          </Card>
+        <Col span={4}>
+          <KPICard
+            title="本月收款金额"
+            value={stats.monthly_payment_amount || 0}
+            prefix={<DollarOutlined />}
+            gradient="linear-gradient(135deg, #52c41a 0%, #95de64 100%)"
+            formatter={(v) => formatAmount(Number(v))}
+          />
         </Col>
-        <Col span={6}>
-          <Card>
-            <Statistic
-              title="总应收余额"
-              value={stats.total_receivable || 0}
-              precision={2}
-              prefix={<RiseOutlined />}
-              valueStyle={{ color: stats.total_receivable > 0 ? '#cf1322' : '#3f8600' }}
-              formatter={(v) => formatAmount(Number(v))}
-            />
-          </Card>
+        <Col span={4}>
+          <KPICard
+            title="总应收余额"
+            value={stats.total_receivable || 0}
+            prefix={<RiseOutlined />}
+            gradient="linear-gradient(135deg, #fa8c16 0%, #ffc53d 100%)"
+            formatter={(v) => formatAmount(Number(v))}
+          />
         </Col>
-        <Col span={6}>
-          <Card>
-            <Statistic
-              title="逾期合同数"
-              value={stats.overdue_contract_count || 0}
-              prefix={<ExclamationCircleOutlined />}
-              valueStyle={{ color: stats.overdue_contract_count > 0 ? '#cf1322' : '#3f8600' }}
-              suffix="个"
-            />
-          </Card>
+        <Col span={4}>
+          <KPICard
+            title="本月新增客户"
+            value={customerGrowthData.reduce((sum: number, d: any) => sum + d.count, 0)}
+            prefix={<UserOutlined />}
+            gradient="linear-gradient(135deg, #722ed1 0%, #b37feb 100%)"
+            suffix="个"
+          />
+        </Col>
+        <Col span={4}>
+          <KPICard
+            title="本月新增工单"
+            value={(stats as any).monthly_new_service_orders || 0}
+            prefix={<ToolOutlined />}
+            gradient="linear-gradient(135deg, #13c2c2 0%, #5cdbd3 100%)"
+            suffix="个"
+          />
+        </Col>
+        <Col span={4}>
+          <KPICard
+            title="逾期合同数"
+            value={stats.overdue_contract_count || 0}
+            prefix={<ExclamationCircleOutlined />}
+            gradient="linear-gradient(135deg, #f5222d 0%, #ff7875 100%)"
+            suffix="个"
+          />
         </Col>
       </Row>
 
-      {/* 折线图：月度开票/收款趋势 */}
+      {/* 财务趋势 + 业绩排行 */}
       <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
         <Col span={16}>
-          <Card title="月度开票/收款趋势">
-            <Line
-              data={trendData}
-              xField="month"
-              yField="value"
-              colorField="category"
-              height={280}
-              point={{ shapeField: 'circle', sizeField: 4 }}
-              axis={{ y: { labelFormatter: (v: number) => `¥${(v / 10000).toFixed(1)}万` } }}
-              legend={{ position: 'top-right' }}
-              tooltip={{ title: 'month', items: [{ field: 'value', name: '金额', valueFormatter: (v: number) => formatAmount(v) }] }}
-            />
+          <Card title="月度开票/收款趋势" bodyStyle={{ padding: 12 }}>
+            <Line {...trendConfig} height={300} />
           </Card>
         </Col>
-
-        {/* 饼图：合同状态分布 */}
         <Col span={8}>
-          <Card title="合同状态分布">
-            <Pie
-              data={contractPieData}
-              angleField="value"
-              colorField="type"
-              height={280}
-              innerRadius={0.5}
-              label={{ text: 'type', style: { fontSize: 12 } }}
-              legend={{ position: 'bottom' }}
-              tooltip={{ items: [{ field: 'value', name: '数量' }] }}
-            />
+          <Card title="员工业绩排行 TOP5" bodyStyle={{ padding: '12px 20px' }}>
+            {topPerformers.length === 0 && (
+              <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无数据" />
+            )}
+            {topPerformers.map((p: any, index: number) => {
+              const colors = ['#ff4d4f', '#ff7875', '#ffa39e', '#bfbfbf', '#bfbfbf']
+              return (
+                <div
+                  key={p.user_id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '14px 0',
+                    borderBottom: '1px solid #f0f0f0',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div
+                      style={{
+                        width: 26,
+                        height: 26,
+                        borderRadius: '50%',
+                        background: colors[index] || '#bfbfbf',
+                        color: '#fff',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontWeight: 700,
+                        fontSize: 13,
+                      }}
+                    >
+                      {index + 1}
+                    </div>
+                    <div style={{ fontWeight: 500, fontSize: 14 }}>{p.full_name || '-'}</div>
+                  </div>
+                  <div style={{ color: '#cf1322', fontWeight: 600, fontSize: 14 }}>
+                    {formatAmount(p.total_amount)}
+                  </div>
+                </div>
+              )
+            })}
           </Card>
         </Col>
       </Row>
 
-      {/* 柱状图：服务工单状态分布 */}
+      {/* 合同状态 + 服务类型金额 + 服务工单状态 */}
       <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
-        <Col span={12}>
-          <Card title="服务工单状态分布">
-            <Column
-              data={serviceBarData}
-              xField="status"
-              yField="count"
-              height={240}
-              label={{ position: 'inside' }}
-              tooltip={{ items: [{ field: 'count', name: '数量' }] }}
-              style={{ fill: '#1890ff' }}
-            />
+        <Col span={8}>
+          <Card title="合同状态分布" bodyStyle={{ padding: 12 }}>
+            <Pie {...pieConfig} height={260} />
           </Card>
         </Col>
+        <Col span={8}>
+          <Card title="合同金额按服务类型" bodyStyle={{ padding: 12 }}>
+            <Column {...amountByServiceConfig} height={260} />
+          </Card>
+        </Col>
+        <Col span={8}>
+          <Card title="服务工单状态分布" bodyStyle={{ padding: 12 }}>
+            <Column {...serviceBarConfig} height={260} />
+          </Card>
+        </Col>
+      </Row>
 
-        {/* 逾期合同列表 */}
+      {/* 客户增长趋势 + 逾期合同 */}
+      <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
         <Col span={12}>
-          <Card title="逾期应收合同" extra={<Tag color="red">{stats.overdue_contract_count} 个</Tag>}>
-            {(stats.overdue_contracts || []).slice(0, 5).map((c) => (
-              <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #f0f0f0' }}>
-                <div>
-                  <div style={{ fontWeight: 500 }}>{c.customer_name}</div>
-                  <div style={{ fontSize: 12, color: '#8c8c8c' }}>{c.contract_no} · 到期 {c.end_date}</div>
+          <Card title="客户增长趋势" bodyStyle={{ padding: 12 }}>
+            <Line {...customerGrowthConfig} height={280} />
+          </Card>
+        </Col>
+        <Col span={12}>
+          <Card
+            title="逾期应收合同"
+            extra={<Tag color="red">{stats.overdue_contract_count} 个</Tag>}
+            bodyStyle={{ padding: '12px 20px' }}
+          >
+            {overdueContracts.length === 0 ? (
+              <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无逾期合同" />
+            ) : (
+              overdueContracts.map((c: any) => (
+                <div
+                  key={c.id}
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '12px 0',
+                    borderBottom: '1px solid #f0f0f0',
+                  }}
+                >
+                  <div>
+                    <div style={{ fontWeight: 500, fontSize: 14 }}>{c.customer_name}</div>
+                    <div style={{ fontSize: 12, color: '#8c8c8c', marginTop: 2 }}>
+                      {c.contract_no} · 到期 {c.end_date}
+                    </div>
+                  </div>
+                  <div style={{ color: '#ff4d4f', fontWeight: 600, fontSize: 14 }}>
+                    {formatAmount(c.receivable_amount)}
+                  </div>
                 </div>
-                <div style={{ color: '#ff4d4f', fontWeight: 600 }}>{formatAmount(c.receivable_amount)}</div>
-              </div>
-            ))}
+              ))
+            )}
           </Card>
         </Col>
       </Row>

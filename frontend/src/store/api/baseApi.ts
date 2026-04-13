@@ -6,6 +6,6 @@ export const baseApi = createApi({
     baseUrl: '/api/v1',
     credentials: 'include',
   }),
-  tagTypes: ['User', 'Customer', 'Contract', 'Service', 'Invoice', 'Payment', 'Dashboard'],
+  tagTypes: ['User', 'Customer', 'Contract', 'ContractTemplate', 'Service', 'Invoice', 'Payment', 'Dashboard', 'Role', 'Department', 'Notification', 'Permission'],
   endpoints: () => ({}),
 })
