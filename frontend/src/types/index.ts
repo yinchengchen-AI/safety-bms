@@ -216,6 +216,14 @@ export interface ServiceItem {
   remark?: string
 }
 
+export interface ServiceItemUpdate {
+  name?: string
+  description?: string
+  quantity?: number
+  unit?: string
+  remark?: string
+}
+
 export interface ServiceReport {
   id: number
   order_id: number

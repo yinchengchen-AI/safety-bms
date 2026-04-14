@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.crud.base import CRUDBase
 from app.models.service import ServiceOrder, ServiceItem, ServiceReport
-from app.schemas.service import ServiceOrderCreate, ServiceOrderUpdate
+from app.schemas.service import ServiceOrderCreate, ServiceOrderUpdate, ServiceItemCreate, ServiceItemUpdate
 from app.core.constants import ServiceOrderStatus
 
 
@@ -68,6 +68,50 @@ class CRUDServiceOrder(CRUDBase[ServiceOrder, ServiceOrderCreate, ServiceOrderUp
         db.commit()
         db.refresh(report)
         return report
+
+    def create_item(
+        self, db: Session, *, order_id: int, obj_in: ServiceItemCreate
+    ) -> ServiceItem:
+        item = ServiceItem(**obj_in.model_dump(), order_id=order_id)
+        db.add(item)
+        db.commit()
+        db.refresh(item)
+        return item
+
+    def update_item(
+        self, db: Session, *, db_obj: ServiceItem, obj_in: ServiceItemUpdate
+    ) -> ServiceItem:
+        update_data = obj_in.model_dump(exclude_unset=True)
+        for field, value in update_data.items():
+            setattr(db_obj, field, value)
+        db.add(db_obj)
+        db.commit()
+        db.refresh(db_obj)
+        return db_obj
+
+    def delete_item(self, db: Session, *, item_id: int) -> Optional[ServiceItem]:
+        item = db.query(ServiceItem).filter(ServiceItem.id == item_id).first()
+        if item:
+            db.delete(item)
+            db.commit()
+        return item
+
+    def delete_report(self, db: Session, *, report_id: int) -> Optional[ServiceReport]:
+        report = db.query(ServiceReport).filter(ServiceReport.id == report_id).first()
+        if report:
+            db.delete(report)
+            db.commit()
+        return report
+
+    def remove(self, db: Session, *, id: int) -> Optional[ServiceOrder]:
+        obj = db.query(ServiceOrder).filter(ServiceOrder.id == id).first()
+        if not obj:
+            return None
+        if obj.status != ServiceOrderStatus.PENDING:
+            raise BusinessError("仅允许删除待处理状态的服务工单", status_code=400)
+        db.delete(obj)
+        db.commit()
+        return obj
 
 
 crud_service = CRUDServiceOrder(ServiceOrder)

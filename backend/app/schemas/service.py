@@ -18,6 +18,14 @@ class ServiceItemCreate(ServiceItemBase):
     pass
 
 
+class ServiceItemUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    quantity: Optional[Decimal] = None
+    unit: Optional[str] = None
+    remark: Optional[str] = None
+
+
 class ServiceItemOut(ServiceItemBase):
     id: int
     order_id: int

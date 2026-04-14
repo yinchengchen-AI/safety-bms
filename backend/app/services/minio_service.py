@@ -6,8 +6,8 @@ from fastapi import UploadFile, HTTPException
 
 from app.config import settings
 
-ALLOWED_EXTENSIONS = {"pdf", "doc", "docx", "jpg", "jpeg", "png"}
-MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
+ALLOWED_EXTENSIONS = {"pdf", "doc", "docx", "wps", "xls", "xlsx", "jpg", "jpeg", "png"}
+MAX_FILE_SIZE = 20 * 1024 * 1024  # 20MB
 
 
 class MinIOService:
@@ -47,7 +47,11 @@ class MinIOService:
                     detail=f"文件大小({file_size / 1024 / 1024:.2f}MB)超过最大限制({MAX_FILE_SIZE / 1024 / 1024:.0f}MB)",
                 )
 
-            object_name = f"{prefix}/{uuid.uuid4().hex}.{ext}" if prefix else f"{uuid.uuid4().hex}.{ext}"
+            object_name = (
+                f"{prefix}/{uuid.uuid4().hex}.{ext}"
+                if prefix
+                else f"{uuid.uuid4().hex}.{ext}"
+            )
             self.client.put_object(
                 self.bucket,
                 object_name,
@@ -66,6 +70,7 @@ class MinIOService:
     def get_presigned_url(self, object_name: str, expires_seconds: int = 3600) -> str:
         """生成预签名下载URL"""
         from datetime import timedelta
+
         try:
             url = self.client.presigned_get_object(
                 self.bucket,

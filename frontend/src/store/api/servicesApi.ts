@@ -1,5 +1,5 @@
 import { baseApi } from './baseApi'
-import type { ServiceOrder, ServiceOrderCreate, PageResponse, ServiceOrderStatus } from '@/types'
+import type { ServiceOrder, ServiceOrderCreate, PageResponse, ServiceOrderStatus, ServiceItem, ServiceItemUpdate } from '@/types'
 
 export const servicesApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
@@ -27,6 +27,22 @@ export const servicesApi = baseApi.injectEndpoints({
       query: (id) => ({ url: `/services/${id}`, method: 'DELETE' }),
       invalidatesTags: ['Service'],
     }),
+    createServiceItem: builder.mutation<ServiceItem, { orderId: number; data: Omit<ServiceItem, 'id' | 'order_id'> }>({
+      query: ({ orderId, data }) => ({ url: `/services/${orderId}/items`, method: 'POST', body: data }),
+      invalidatesTags: (_, __, { orderId }) => [{ type: 'Service', orderId }],
+    }),
+    updateServiceItem: builder.mutation<ServiceItem, { orderId: number; itemId: number; data: ServiceItemUpdate }>({
+      query: ({ orderId, itemId, data }) => ({ url: `/services/${orderId}/items/${itemId}`, method: 'PATCH', body: data }),
+      invalidatesTags: (_, __, { orderId }) => [{ type: 'Service', orderId }],
+    }),
+    deleteServiceItem: builder.mutation<{ message: string }, { orderId: number; itemId: number }>({
+      query: ({ orderId, itemId }) => ({ url: `/services/${orderId}/items/${itemId}`, method: 'DELETE' }),
+      invalidatesTags: (_, __, { orderId }) => [{ type: 'Service', orderId }],
+    }),
+    deleteServiceReport: builder.mutation<{ message: string }, { orderId: number; reportId: number }>({
+      query: ({ orderId, reportId }) => ({ url: `/services/${orderId}/reports/${reportId}`, method: 'DELETE' }),
+      invalidatesTags: (_, __, { orderId }) => [{ type: 'Service', orderId }],
+    }),
   }),
 })
 
@@ -37,4 +53,8 @@ export const {
   useUpdateServiceOrderMutation,
   useUpdateServiceStatusMutation,
   useDeleteServiceOrderMutation,
+  useCreateServiceItemMutation,
+  useUpdateServiceItemMutation,
+  useDeleteServiceItemMutation,
+  useDeleteServiceReportMutation,
 } = servicesApi
