@@ -38,6 +38,7 @@ export const InvoiceStatusLabels: Record<string, string> = {
   applying: '申请中',
   issued: '已开票',
   sent: '已寄出',
+  rejected: '已拒绝',
 }
 
 export const PaymentMethodLabels: Record<string, string> = {

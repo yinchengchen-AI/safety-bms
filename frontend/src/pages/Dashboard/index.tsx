@@ -68,40 +68,40 @@ const Dashboard: React.FC = () => {
 
   // 月度开票/收款趋势
   const invoiceTrend = (stats.monthly_invoice_trend || []).map((d: any) => ({
-    month: `${d.month}月`,
-    value: Number(d.total || 0),
-    type: '开票金额',
+    '月份': `${d.month}月`,
+    '金额': Number(d.total || 0),
+    '类型': '开票金额',
   }))
   const paymentTrend = (stats.monthly_payment_trend || []).map((d: any) => ({
-    month: `${d.month}月`,
-    value: Number(d.total || 0),
-    type: '收款金额',
+    '月份': `${d.month}月`,
+    '金额': Number(d.total || 0),
+    '类型': '收款金额',
   }))
   const trendData = [...invoiceTrend, ...paymentTrend]
 
   // 合同状态分布
   const contractPieData = (stats.contract_status_distribution || []).map((d: any) => ({
-    name: ContractStatusLabels[d.status as keyof typeof ContractStatusLabels] || d.status,
-    value: Number(d.count),
+    '状态': ContractStatusLabels[d.status as keyof typeof ContractStatusLabels] || d.status,
+    '数量': Number(d.count),
   }))
 
   // 服务工单状态分布
   const serviceBarData = (stats.service_status_distribution || []).map((d: any) => ({
-    name: ServiceOrderStatusLabels[d.status as keyof typeof ServiceOrderStatusLabels] || d.status,
-    value: Number(d.count),
+    '状态': ServiceOrderStatusLabels[d.status as keyof typeof ServiceOrderStatusLabels] || d.status,
+    '数量': Number(d.count),
   }))
 
   // 客户增长趋势
   const customerGrowthData = ((stats as any).customer_growth_trend || []).map((d: any) => ({
-    month: `${d.month}月`,
-    count: Number(d.count),
+    '月份': `${d.month}月`,
+    '新增客户数': Number(d.count),
   }))
 
   // 合同金额按服务类型分布
   const contractAmountByServiceData = ((stats as any).contract_amount_by_service_type || []).map(
     (d: any) => ({
-      name: ServiceTypeLabels[d.service_type as keyof typeof ServiceTypeLabels] || d.service_type,
-      value: Number(d.total_amount),
+      '服务类型': ServiceTypeLabels[d.service_type as keyof typeof ServiceTypeLabels] || d.service_type,
+      '金额': Number(d.total_amount),
     })
   )
 
@@ -113,9 +113,10 @@ const Dashboard: React.FC = () => {
 
   const trendConfig = {
     data: trendData,
-    xField: 'month',
-    yField: 'value',
-    seriesField: 'type',
+    xField: '月份',
+    yField: '金额',
+    seriesField: '类型',
+    colorField: '类型',
     smooth: true,
     color: ['#1890ff', '#52c41a'],
     legend: { position: 'top-right' as const },
@@ -127,8 +128,8 @@ const Dashboard: React.FC = () => {
     tooltip: {
       items: [
         (d: any) => ({
-          name: d.type,
-          value: formatAmount(d.value),
+          name: d['类型'],
+          value: formatAmount(d['金额']),
         }),
       ],
     },
@@ -136,21 +137,21 @@ const Dashboard: React.FC = () => {
 
   const pieConfig = {
     data: contractPieData,
-    angleField: 'value',
-    colorField: 'name',
+    angleField: '数量',
+    colorField: '状态',
     innerRadius: 0.5,
     legend: {
       color: { position: 'bottom' as const, layout: { justifyContent: 'center' } },
     },
     label: {
-      text: (d: any) => `${d.name}\n${d.value}个`,
+      text: (d: any) => `${d['状态']}\n${d['数量']}个`,
       style: { fontSize: 12 },
     },
     tooltip: {
       items: [
         (d: any) => ({
-          name: d.name,
-          value: `${d.value}个`,
+          name: d['状态'],
+          value: `${d['数量']}个`,
         }),
       ],
     },
@@ -158,20 +159,20 @@ const Dashboard: React.FC = () => {
 
   const serviceBarConfig = {
     data: serviceBarData,
-    xField: 'name',
-    yField: 'value',
+    xField: '状态',
+    yField: '数量',
     color: '#1890ff',
     xAxis: { title: { text: '状态' } },
     yAxis: { title: { text: '数量（个）' } },
     label: {
-      text: (d: any) => `${d.value}个`,
+      text: (d: any) => `${d['数量']}个`,
       style: { fill: '#fff' },
     },
     tooltip: {
       items: [
         (d: any) => ({
           name: '工单数量',
-          value: `${d.value}个`,
+          value: `${d['数量']}个`,
         }),
       ],
     },
@@ -180,8 +181,8 @@ const Dashboard: React.FC = () => {
 
   const amountByServiceConfig = {
     data: contractAmountByServiceData,
-    xField: 'name',
-    yField: 'value',
+    xField: '服务类型',
+    yField: '金额',
     color: '#722ed1',
     xAxis: {
       title: { text: '服务类型' },
@@ -192,14 +193,14 @@ const Dashboard: React.FC = () => {
       labelFormatter: (v: number) => `¥${(v / 10000).toFixed(1)}万`,
     },
     label: {
-      text: (d: any) => `¥${(d.value / 10000).toFixed(1)}万`,
+      text: (d: any) => `¥${(d['金额'] / 10000).toFixed(1)}万`,
       style: { fill: '#fff' },
     },
     tooltip: {
       items: [
         (d: any) => ({
           name: '合同金额',
-          value: formatAmount(d.value),
+          value: formatAmount(d['金额']),
         }),
       ],
     },
@@ -208,8 +209,8 @@ const Dashboard: React.FC = () => {
 
   const customerGrowthConfig = {
     data: customerGrowthData,
-    xField: 'month',
-    yField: 'count',
+    xField: '月份',
+    yField: '新增客户数',
     smooth: true,
     color: '#13c2c2',
     areaStyle: { fill: 'rgba(19, 194, 194, 0.15)' },
@@ -219,7 +220,7 @@ const Dashboard: React.FC = () => {
       items: [
         (d: any) => ({
           name: '新增客户数',
-          value: `${d.count} 个`,
+          value: `${d['新增客户数']} 个`,
         }),
       ],
     },
@@ -259,7 +260,7 @@ const Dashboard: React.FC = () => {
         <Col span={4}>
           <KPICard
             title="本月新增客户"
-            value={customerGrowthData.reduce((sum: number, d: any) => sum + d.count, 0)}
+            value={customerGrowthData.reduce((sum: number, d: any) => sum + d['新增客户数'], 0)}
             prefix={<UserOutlined />}
             gradient="linear-gradient(135deg, #722ed1 0%, #b37feb 100%)"
             suffix="个"
@@ -293,7 +294,7 @@ const Dashboard: React.FC = () => {
           </Card>
         </Col>
         <Col span={8}>
-          <Card title="员工业绩排行 TOP5" bodyStyle={{ padding: '12px 20px' }}>
+          <Card title="员工业绩排行（前5名）" bodyStyle={{ padding: '12px 20px' }}>
             {topPerformers.length === 0 && (
               <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无数据" />
             )}
