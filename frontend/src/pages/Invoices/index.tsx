@@ -1,16 +1,20 @@
-import React, { useState, useEffect } from 'react'
-import { Table, Button, Input, Select, Tag, Space, Popconfirm, message, Drawer, Form, InputNumber, Alert, DatePicker } from 'antd'
+import React, { useState, useEffect, useMemo } from 'react'
+import { Table, Button, Input, Select, Tag, Space, Popconfirm, message, Drawer, Form, InputNumber, Alert, DatePicker, Modal } from 'antd'
 import { PlusOutlined } from '@ant-design/icons'
 import { PermissionButton } from '@/components/auth/PermissionButton'
-import { useListInvoicesQuery, useCreateInvoiceMutation, useUpdateInvoiceMutation, useDeleteInvoiceMutation } from '@/store/api/invoicesApi'
+import { useListInvoicesQuery, useCreateInvoiceMutation, useUpdateInvoiceMutation, useDeleteInvoiceMutation, useAuditInvoiceMutation } from '@/store/api/invoicesApi'
 import { useListContractsQuery } from '@/store/api/contractsApi'
+import { useListCustomersQuery } from '@/store/api/customersApi'
 import { InvoiceStatusLabels, InvoiceTypeLabels, formatAmount, generateBizNo } from '@/utils/constants'
 import { downloadExport } from '@/utils/export'
 import type { Invoice, InvoiceStatus } from '@/types'
 import dayjs from 'dayjs'
 
 const statusColors: Record<InvoiceStatus, string> = {
-  applying: 'default', issued: 'success', sent: 'processing',
+  applying: 'default',
+  issued: 'success',
+  sent: 'blue',
+  rejected: 'error',
 }
 
 const Invoices: React.FC = () => {
@@ -19,10 +23,15 @@ const Invoices: React.FC = () => {
   const [status, setStatus] = useState<InvoiceStatus | undefined>()
   const [createOpen, setCreateOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
+  const [auditOpen, setAuditOpen] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
+  const [auditingId, setAuditingId] = useState<number | null>(null)
+  const [auditAction, setAuditAction] = useState<'approve' | 'reject' | null>(null)
+  const [customerId, setCustomerId] = useState<number | undefined>()
   const [contractId, setContractId] = useState<number | undefined>()
   const [form] = Form.useForm()
   const [editForm] = Form.useForm()
+  const [auditForm] = Form.useForm()
 
   useEffect(() => {
     if (createOpen) {
@@ -30,11 +39,18 @@ const Invoices: React.FC = () => {
     }
   }, [createOpen, form])
 
-  const { data, isLoading } = useListInvoicesQuery({ page, page_size: 20, keyword, status })
+  const { data, isLoading, refetch } = useListInvoicesQuery({ page, page_size: 20, keyword, status })
   const { data: contractsData } = useListContractsQuery({ page: 1, page_size: 200, status: 'active' })
+  const { data: customersData } = useListCustomersQuery({ page: 1, page_size: 200 })
   const [createInvoice, { isLoading: creating, error: createError }] = useCreateInvoiceMutation()
   const [updateInvoice, { isLoading: updating }] = useUpdateInvoiceMutation()
   const [deleteInvoice] = useDeleteInvoiceMutation()
+  const [auditInvoice, { isLoading: auditing }] = useAuditInvoiceMutation()
+
+  const filteredContracts = useMemo(() => {
+    if (!customerId) return contractsData?.items || []
+    return contractsData?.items.filter(c => c.customer_id === customerId) || []
+  }, [customerId, contractsData])
 
   const selectedContract = contractsData?.items.find(c => c.id === contractId)
 
@@ -49,29 +65,30 @@ const Invoices: React.FC = () => {
     const payload = {
       ...values,
       contract_id: contractId,
-      invoice_date: values.invoice_date ? dayjs(values.invoice_date).format('YYYY-MM-DD') : undefined,
     }
     try {
       await createInvoice(payload).unwrap()
       message.success('开票申请提交成功')
       setCreateOpen(false)
       form.resetFields()
+      setCustomerId(undefined)
       setContractId(undefined)
     } catch (err: any) {
       message.error(err?.data?.detail || '创建失败')
     }
   }
 
-  const handleEdit = (record: Invoice) => {
+  const handleEdit = async (record: Invoice) => {
     setEditingId(record.id)
+    setCustomerId(record.contract_id ? (contractsData?.items.find(c => c.id === record.contract_id)?.customer_id) : undefined)
     setContractId(record.contract_id)
     editForm.setFieldsValue({
+      customer_id: record.contract_id ? (contractsData?.items.find(c => c.id === record.contract_id)?.customer_id) : undefined,
       contract_id: record.contract_id,
       invoice_no: record.invoice_no,
       invoice_type: record.invoice_type,
       amount: record.amount,
       tax_rate: record.tax_rate,
-      invoice_date: record.invoice_date ? dayjs(record.invoice_date) : undefined,
       remark: record.remark,
     })
     setEditOpen(true)
@@ -82,7 +99,6 @@ const Invoices: React.FC = () => {
     const payload = {
       ...values,
       contract_id: contractId,
-      invoice_date: values.invoice_date ? dayjs(values.invoice_date).format('YYYY-MM-DD') : undefined,
     }
     try {
       await updateInvoice({ id: editingId, data: payload }).unwrap()
@@ -90,9 +106,59 @@ const Invoices: React.FC = () => {
       setEditOpen(false)
       editForm.resetFields()
       setEditingId(null)
+      setCustomerId(undefined)
       setContractId(undefined)
     } catch (err: any) {
       message.error(err?.data?.detail || '更新失败')
+    }
+  }
+
+  const openAuditModal = (record: Invoice, action: 'approve' | 'reject') => {
+    setAuditingId(record.id)
+    setAuditAction(action)
+    auditForm.resetFields()
+    setAuditOpen(true)
+  }
+
+  const handleAudit = async () => {
+    if (!auditingId || !auditAction) return
+    const remark = auditForm.getFieldValue('remark')
+    const invoiceDate = auditForm.getFieldValue('invoice_date')
+    const actualInvoiceNo = auditForm.getFieldValue('actual_invoice_no')
+
+    if (auditAction === 'approve') {
+      if (!invoiceDate) {
+        message.error('请填写开票日期')
+        return
+      }
+      if (!actualInvoiceNo) {
+        message.error('请填写发票号')
+        return
+      }
+    } else if (auditAction === 'reject') {
+      if (!remark) {
+        message.error('请填写驳回原因')
+        return
+      }
+    }
+
+    try {
+      await auditInvoice({
+        id: auditingId,
+        data: {
+          action: auditAction,
+          remark: remark || undefined,
+          invoice_date: invoiceDate ? dayjs(invoiceDate).format('YYYY-MM-DD') : undefined,
+          actual_invoice_no: actualInvoiceNo || undefined,
+        },
+      }).unwrap()
+      message.success(auditAction === 'approve' ? '审核通过' : '审核已驳回')
+      setAuditOpen(false)
+      auditForm.resetFields()
+      setAuditingId(null)
+      setAuditAction(null)
+    } catch (err: any) {
+      message.error(err?.data?.detail || '审核失败')
     }
   }
 
@@ -120,10 +186,17 @@ const Invoices: React.FC = () => {
     { title: '开票日期', dataIndex: 'invoice_date', key: 'invoice_date' },
     { title: '操作', key: 'action', render: (_: any, r: Invoice) => (
       <Space>
-        <PermissionButton permission="invoice:update" type="link" size="small" onClick={() => handleEdit(r)}>编辑</PermissionButton>
-        <Popconfirm title="确认删除？" onConfirm={() => deleteInvoice(r.id)}>
-          <PermissionButton permission="invoice:delete" type="link" danger size="small">删除</PermissionButton>
-        </Popconfirm>
+        {r.status === 'applying' && (
+          <>
+            <Button size="small" type="link" onClick={() => openAuditModal(r, 'approve')}>通过</Button>
+            <Button size="small" type="link" danger onClick={() => openAuditModal(r, 'reject')}>驳回</Button>
+          </>
+        )}
+        {r.status === 'applying' && (
+          <Popconfirm title="确认删除？" onConfirm={() => deleteInvoice(r.id).then(() => refetch())}>
+            <PermissionButton permission="invoice:delete" type="link" danger size="small">删除</PermissionButton>
+          </Popconfirm>
+        )}
       </Space>
     )},
   ]
@@ -145,9 +218,9 @@ const Invoices: React.FC = () => {
       <Table rowKey="id" columns={columns} dataSource={data?.items} loading={isLoading}
         pagination={{ current: page, pageSize: 20, total: data?.total, onChange: setPage, showTotal: (t) => `共 ${t} 条` }} />
 
-      <Drawer title="新建开票申请" open={createOpen} onClose={() => { setCreateOpen(false); setContractId(undefined) }} width={480} footer={
+      <Drawer title="新建开票申请" open={createOpen} onClose={() => { setCreateOpen(false); setCustomerId(undefined); setContractId(undefined) }} width={480} footer={
         <Space style={{ float: 'right' }}>
-          <Button onClick={() => { setCreateOpen(false); setContractId(undefined) }}>取消</Button>
+          <Button onClick={() => { setCreateOpen(false); setCustomerId(undefined); setContractId(undefined) }}>取消</Button>
           <Button type="primary" loading={creating} onClick={() => form.submit()}>提交</Button>
         </Space>
       }>
@@ -161,9 +234,13 @@ const Invoices: React.FC = () => {
         )}
         {createError && <Alert type="error" message={(createError as any)?.data?.detail} style={{ marginBottom: 16 }} />}
         <Form form={form} layout="vertical" onFinish={handleCreate}>
+          <Form.Item name="customer_id" label="关联公司" rules={[{ required: true }]}>
+            <Select showSearch optionFilterProp="label" placeholder="请先选择公司" onChange={(v) => { setCustomerId(v); setContractId(undefined); form.setFieldValue('contract_id', undefined) }}
+              options={customersData?.items.map(c => ({ value: c.id, label: c.name })) || []} />
+          </Form.Item>
           <Form.Item name="contract_id" label="关联合同" rules={[{ required: true }]}>
-            <Select showSearch optionFilterProp="label" onChange={(v) => setContractId(v)}
-              options={contractsData?.items.map(c => ({ value: c.id, label: `${c.contract_no} - ${c.title}` })) || []} />
+            <Select showSearch optionFilterProp="label" placeholder={customerId ? '请选择合同' : '请先选择公司'} disabled={!customerId} onChange={(v) => setContractId(v)}
+              options={filteredContracts.map(c => ({ value: c.id, label: `${c.contract_no} - ${c.title}` }))} />
           </Form.Item>
           <Form.Item name="invoice_no" label="发票编号" rules={[{ required: true }]}><Input disabled /></Form.Item>
           <Form.Item name="invoice_type" label="发票类型" rules={[{ required: true }]} initialValue="special">
@@ -181,21 +258,24 @@ const Invoices: React.FC = () => {
               { value: 0.13, label: '13%' },
             ]} />
           </Form.Item>
-          <Form.Item name="invoice_date" label="开票日期"><DatePicker style={{ width: '100%' }} /></Form.Item>
           <Form.Item name="remark" label="备注"><Input.TextArea rows={3} /></Form.Item>
         </Form>
       </Drawer>
 
-      <Drawer title="编辑开票申请" open={editOpen} onClose={() => { setEditOpen(false); setEditingId(null); setContractId(undefined) }} width={480} footer={
+      <Drawer title="编辑发票" open={editOpen} onClose={() => { setEditOpen(false); setEditingId(null); setCustomerId(undefined); setContractId(undefined) }} width={480} footer={
         <Space style={{ float: 'right' }}>
-          <Button onClick={() => { setEditOpen(false); setEditingId(null); setContractId(undefined) }}>取消</Button>
+          <Button onClick={() => { setEditOpen(false); setEditingId(null); setCustomerId(undefined); setContractId(undefined) }}>取消</Button>
           <Button type="primary" loading={updating} onClick={() => editForm.submit()}>保存</Button>
         </Space>
       }>
         <Form form={editForm} layout="vertical" onFinish={handleUpdate}>
+          <Form.Item name="customer_id" label="关联公司" rules={[{ required: true }]}>
+            <Select showSearch optionFilterProp="label" placeholder="请先选择公司" onChange={(v) => { setCustomerId(v); setContractId(undefined); editForm.setFieldValue('contract_id', undefined) }}
+              options={customersData?.items.map(c => ({ value: c.id, label: c.name })) || []} />
+          </Form.Item>
           <Form.Item name="contract_id" label="关联合同" rules={[{ required: true }]}>
-            <Select showSearch optionFilterProp="label" onChange={(v) => setContractId(v)}
-              options={contractsData?.items.map(c => ({ value: c.id, label: `${c.contract_no} - ${c.title}` })) || []} />
+            <Select showSearch optionFilterProp="label" placeholder={customerId ? '请选择合同' : '请先选择公司'} disabled={!customerId} onChange={(v) => setContractId(v)}
+              options={filteredContracts.map(c => ({ value: c.id, label: `${c.contract_no} - ${c.title}` }))} />
           </Form.Item>
           <Form.Item name="invoice_no" label="发票编号" rules={[{ required: true }]}><Input /></Form.Item>
           <Form.Item name="invoice_type" label="发票类型" rules={[{ required: true }]}>
@@ -213,10 +293,36 @@ const Invoices: React.FC = () => {
               { value: 0.13, label: '13%' },
             ]} />
           </Form.Item>
-          <Form.Item name="invoice_date" label="开票日期"><DatePicker style={{ width: '100%' }} /></Form.Item>
           <Form.Item name="remark" label="备注"><Input.TextArea rows={3} /></Form.Item>
         </Form>
       </Drawer>
+
+      <Modal
+        title={auditAction === 'approve' ? '通过审核' : '驳回申请'}
+        open={auditOpen}
+        onOk={handleAudit}
+        onCancel={() => { setAuditOpen(false); auditForm.resetFields(); setAuditingId(null); setAuditAction(null) }}
+        confirmLoading={auditing}
+        okText="确认"
+        cancelText="取消"
+        okButtonProps={{ danger: auditAction === 'reject' }}
+      >
+        <Form form={auditForm} layout="vertical">
+          {auditAction === 'approve' && (
+            <>
+              <Form.Item name="invoice_date" label="开票日期" rules={[{ required: true, message: '请填写开票日期' }]}>
+                <DatePicker style={{ width: '100%' }} />
+              </Form.Item>
+              <Form.Item name="actual_invoice_no" label="发票号" rules={[{ required: true, message: '请填写发票号' }]}>
+                <Input placeholder="请输入实际发票号" />
+              </Form.Item>
+            </>
+          )}
+          <Form.Item name="remark" label={auditAction === 'approve' ? '备注（选填）' : '驳回原因'} rules={auditAction === 'reject' ? [{ required: true, message: '请填写驳回原因' }] : []}>
+            <Input.TextArea rows={3} placeholder={auditAction === 'reject' ? '请输入驳回原因' : '选填备注'} />
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   )
 }

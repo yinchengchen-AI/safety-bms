@@ -1,5 +1,5 @@
 from typing import Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from datetime import datetime, date
 from decimal import Decimal
 
@@ -56,3 +56,10 @@ class InvoiceListOut(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class InvoiceAuditRequest(BaseModel):
+    action: str = Field(..., description="审核动作: approve 或 reject")
+    remark: Optional[str] = Field(None, description="审核备注")
+    invoice_date: Optional[date] = Field(None, description="开票日期（通过时必填）")
+    actual_invoice_no: Optional[str] = Field(None, description="实际发票号（通过时必填）")

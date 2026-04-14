@@ -1,6 +1,13 @@
 import { baseApi } from './baseApi'
 import type { Invoice, InvoiceCreate, PageResponse, InvoiceStatus } from '@/types'
 
+export interface InvoiceAuditRequest {
+  action: 'approve' | 'reject'
+  remark?: string
+  invoice_date?: string
+  actual_invoice_no?: string
+}
+
 export const invoicesApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
     listInvoices: builder.query<PageResponse<Invoice>, { page?: number; page_size?: number; contract_id?: number; customer_id?: number; status?: InvoiceStatus; keyword?: string }>({
@@ -23,6 +30,10 @@ export const invoicesApi = baseApi.injectEndpoints({
       query: (id) => ({ url: `/invoices/${id}`, method: 'DELETE' }),
       invalidatesTags: ['Invoice'],
     }),
+    auditInvoice: builder.mutation<Invoice, { id: number; data: InvoiceAuditRequest }>({
+      query: ({ id, data }) => ({ url: `/invoices/${id}/audit`, method: 'POST', body: data }),
+      invalidatesTags: (_, __, { id }) => [{ type: 'Invoice', id }, 'Invoice'],
+    }),
     getDownloadUrl: builder.query<{ url: string }, number>({
       query: (id) => `/invoices/${id}/download-url`,
     }),
@@ -35,5 +46,6 @@ export const {
   useCreateInvoiceMutation,
   useUpdateInvoiceMutation,
   useDeleteInvoiceMutation,
+  useAuditInvoiceMutation,
   useGetDownloadUrlQuery,
 } = invoicesApi
