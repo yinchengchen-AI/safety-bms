@@ -8,12 +8,16 @@ from app.models.contract import Contract, ContractChange, ContractTemplate
 from app.models.invoice import Invoice
 from app.models.payment import Payment
 from app.schemas.contract import ContractCreate, ContractUpdate, ContractTemplateCreate
-from app.core.constants import ContractStatus
+from app.core.constants import ContractStatus, InvoiceStatus
 from app.core.exceptions import ContractStatusError
 
 ALLOWED_TRANSITIONS = {
     ContractStatus.DRAFT: {ContractStatus.REVIEW, ContractStatus.TERMINATED},
-    ContractStatus.REVIEW: {ContractStatus.ACTIVE, ContractStatus.DRAFT, ContractStatus.TERMINATED},
+    ContractStatus.REVIEW: {
+        ContractStatus.ACTIVE,
+        ContractStatus.DRAFT,
+        ContractStatus.TERMINATED,
+    },
     ContractStatus.ACTIVE: {ContractStatus.SIGNED, ContractStatus.TERMINATED},
     ContractStatus.SIGNED: {ContractStatus.COMPLETED, ContractStatus.TERMINATED},
     ContractStatus.COMPLETED: set(),
@@ -22,7 +26,9 @@ ALLOWED_TRANSITIONS = {
 
 
 class CRUDContract(CRUDBase[Contract, ContractCreate, ContractUpdate]):
-    def create(self, db: Session, *, obj_in: ContractCreate, created_by: int | None = None) -> Contract:
+    def create(
+        self, db: Session, *, obj_in: ContractCreate, created_by: int | None = None
+    ) -> Contract:
         db_obj = Contract(**obj_in.model_dump(), created_by=created_by)
         db.add(db_obj)
         db.commit()
@@ -46,7 +52,8 @@ class CRUDContract(CRUDBase[Contract, ContractCreate, ContractUpdate]):
             query = query.filter(Contract.status == status)
         if keyword:
             query = query.filter(
-                (Contract.title.ilike(f"%{keyword}%")) | (Contract.contract_no.ilike(f"%{keyword}%"))
+                (Contract.title.ilike(f"%{keyword}%"))
+                | (Contract.contract_no.ilike(f"%{keyword}%"))
             )
         total = query.count()
         items = (
@@ -59,11 +66,19 @@ class CRUDContract(CRUDBase[Contract, ContractCreate, ContractUpdate]):
         return total, items
 
     def update_status(
-        self, db: Session, *, db_obj: Contract, new_status: ContractStatus, changed_by: int, remark: str = ""
+        self,
+        db: Session,
+        *,
+        db_obj: Contract,
+        new_status: ContractStatus,
+        changed_by: int,
+        remark: str = "",
     ) -> Contract:
         old_status = db_obj.status
         if new_status not in ALLOWED_TRANSITIONS.get(old_status, set()):
-            raise ContractStatusError(f"状态不允许从 {old_status.value} 变更为 {new_status.value}")
+            raise ContractStatusError(
+                f"状态不允许从 {old_status.value} 变更为 {new_status.value}"
+            )
         db_obj.status = new_status
         change = ContractChange(
             contract_id=db_obj.id,
@@ -82,6 +97,7 @@ class CRUDContract(CRUDBase[Contract, ContractCreate, ContractUpdate]):
         result = (
             db.query(func.coalesce(func.sum(Invoice.amount), 0))
             .filter(Invoice.contract_id == contract_id)
+            .filter(Invoice.status.in_([InvoiceStatus.ISSUED, InvoiceStatus.SENT]))
             .scalar()
         )
         return Decimal(str(result))
@@ -96,6 +112,7 @@ class CRUDContract(CRUDBase[Contract, ContractCreate, ContractUpdate]):
 
     def soft_delete(self, db: Session, *, contract_id: int) -> None:
         from datetime import datetime, timezone
+
         contract = db.query(Contract).get(contract_id)
         if contract:
             contract.is_deleted = True
@@ -104,7 +121,13 @@ class CRUDContract(CRUDBase[Contract, ContractCreate, ContractUpdate]):
 
 
 class CRUDContractTemplate(CRUDBase[ContractTemplate, ContractTemplateCreate, dict]):
-    def create(self, db: Session, *, obj_in: ContractTemplateCreate, created_by: int | None = None) -> ContractTemplate:
+    def create(
+        self,
+        db: Session,
+        *,
+        obj_in: ContractTemplateCreate,
+        created_by: int | None = None,
+    ) -> ContractTemplate:
         db_obj = ContractTemplate(**obj_in.model_dump(), created_by=created_by)
         db.add(db_obj)
         db.commit()
