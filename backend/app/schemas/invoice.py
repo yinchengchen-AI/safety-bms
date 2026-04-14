@@ -50,7 +50,9 @@ class InvoiceListOut(BaseModel):
     invoice_type: InvoiceType
     status: InvoiceStatus
     amount: Decimal
+    tax_rate: Decimal
     invoice_date: Optional[date] = None
+    remark: Optional[str] = None
     created_at: datetime
 
     model_config = {"from_attributes": True}

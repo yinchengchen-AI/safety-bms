@@ -66,6 +66,7 @@ const Invoices: React.FC = () => {
     setEditingId(record.id)
     setContractId(record.contract_id)
     editForm.setFieldsValue({
+      contract_id: record.contract_id,
       invoice_no: record.invoice_no,
       invoice_type: record.invoice_type,
       amount: record.amount,
@@ -112,7 +113,7 @@ const Invoices: React.FC = () => {
     { title: '客户', dataIndex: 'customer_name', key: 'customer_name' },
     { title: '发票类型', dataIndex: 'invoice_type', key: 'invoice_type', render: (t: string) => InvoiceTypeLabels[t as keyof typeof InvoiceTypeLabels] },
     { title: '金额', dataIndex: 'amount', key: 'amount', render: formatAmount },
-    { title: '税率', dataIndex: 'tax_rate', key: 'tax_rate', render: (r: number) => `${(r * 100).toFixed(0)}%` },
+    { title: '税率', dataIndex: 'tax_rate', key: 'tax_rate', render: (r?: number | string) => r !== undefined && r !== null ? `${(Number(r) * 100).toFixed(0)}%` : '-' },
     { title: '状态', dataIndex: 'status', key: 'status', render: (s: InvoiceStatus) => (
       <Tag color={statusColors[s]}>{InvoiceStatusLabels[s]}</Tag>
     )},

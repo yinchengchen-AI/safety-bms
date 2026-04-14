@@ -1,8 +1,9 @@
-import React, { useEffect } from 'react'
-import { Card, Form, Input, Button, Avatar, message, Row, Col } from 'antd'
+import React, { useEffect, useState } from 'react'
+import { Card, Form, Input, Button, Avatar, message, Row, Col, Upload } from 'antd'
+import { UploadOutlined } from '@ant-design/icons'
 import { useSelector, useDispatch } from 'react-redux'
 import { selectCurrentUser, setUser } from '@/store/slices/authSlice'
-import { useUpdateMeMutation, useChangePasswordMutation, useGetMeQuery } from '@/store/api/usersApi'
+import { useUpdateMeMutation, useChangePasswordMutation, useGetMeQuery, useUploadAvatarMutation } from '@/store/api/usersApi'
 import type { User } from '@/types'
 
 const passwordPattern = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d\W_]{8,}$/
@@ -15,6 +16,8 @@ const Profile: React.FC = () => {
   const { refetch: refetchMe } = useGetMeQuery()
   const [updateMe, { isLoading: updating }] = useUpdateMeMutation()
   const [changePassword, { isLoading: changing }] = useChangePasswordMutation()
+  const [uploadAvatar, { isLoading: uploadingAvatar }] = useUploadAvatarMutation()
+  const [previewUrl, setPreviewUrl] = useState<string | undefined>(currentUser?.avatar_url)
 
   useEffect(() => {
     if (currentUser) {
@@ -24,6 +27,7 @@ const Profile: React.FC = () => {
         email: currentUser.email,
         avatar_url: currentUser.avatar_url,
       })
+      setPreviewUrl(currentUser.avatar_url)
     }
   }, [currentUser, basicForm])
 
@@ -54,17 +58,62 @@ const Profile: React.FC = () => {
     }
   }
 
+  const handleAvatarUpload = async (options: any) => {
+    const { file, onSuccess, onError } = options
+    try {
+      const result = await uploadAvatar(file as File).unwrap()
+      message.success('头像上传成功')
+      basicForm.setFieldsValue({ avatar_url: result.file_url })
+      setPreviewUrl(result.file_url)
+      const refetched = await refetchMe()
+      if (refetched.data) {
+        dispatch(setUser(refetched.data))
+      }
+      onSuccess?.('ok')
+    } catch (err: any) {
+      message.error(err?.data?.detail || '头像上传失败')
+      onError?.(err)
+    }
+  }
+
+  const beforeUpload = (file: File) => {
+    const isImage = file.type.startsWith('image/')
+    if (!isImage) {
+      message.error('只能上传图片文件')
+    }
+    const isLt2M = file.size / 1024 / 1024 < 2
+    if (!isLt2M) {
+      message.error('图片大小不能超过 2MB')
+    }
+    return isImage && isLt2M
+  }
+
   return (
     <div>
       <Row gutter={[16, 16]}>
         <Col xs={24} md={12}>
           <Card title="基本信息">
             <div style={{ textAlign: 'center', marginBottom: 24 }}>
-              <Avatar size={80} src={currentUser?.avatar_url}>
+              <Avatar size={80} src={previewUrl}>
                 {currentUser?.full_name?.charAt(0) || currentUser?.username?.charAt(0) || 'U'}
               </Avatar>
+              <div style={{ marginTop: 12 }}>
+                <Upload
+                  customRequest={handleAvatarUpload}
+                  beforeUpload={beforeUpload}
+                  showUploadList={false}
+                  accept="image/*"
+                >
+                  <Button icon={<UploadOutlined />} loading={uploadingAvatar}>
+                    上传头像
+                  </Button>
+                </Upload>
+              </div>
             </div>
             <Form form={basicForm} layout="vertical" onFinish={handleBasicSubmit}>
+              <Form.Item name="avatar_url" hidden>
+                <Input />
+              </Form.Item>
               <Form.Item name="full_name" label="姓名">
                 <Input />
               </Form.Item>
@@ -72,9 +121,6 @@ const Profile: React.FC = () => {
                 <Input />
               </Form.Item>
               <Form.Item name="email" label="邮箱" rules={[{ type: 'email' }]}>
-                <Input />
-              </Form.Item>
-              <Form.Item name="avatar_url" label="头像链接">
                 <Input />
               </Form.Item>
               <Form.Item>

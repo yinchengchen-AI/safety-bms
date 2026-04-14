@@ -1,10 +1,10 @@
 from typing import Optional
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, UploadFile, File
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.schemas.user import UserCreate, UserUpdate, UserOut, RoleOut, PasswordChange
-from app.schemas.common import PageResponse, ResponseMsg
+from app.schemas.common import PageResponse, ResponseMsg, FileUploadResponse
 from app.crud.user import crud_user
 from app.dependencies import get_current_user, require_permissions
 from app.core.exceptions import NotFoundError, DuplicateError, BusinessError
@@ -14,6 +14,7 @@ from app.utils.data_scope import check_data_scope
 from app.utils.excel_export import export_excel_response
 from app.core.constants import PermissionCode
 from app.core.security import verify_password, get_password_hash
+from app.services.minio_service import minio_service
 
 router = APIRouter(prefix="/users", tags=["用户管理"])
 
@@ -104,6 +105,20 @@ def update_current_user_info(
     allowed_fields = {"full_name", "phone", "email", "avatar_url"}
     filtered_data = {k: v for k, v in update_data.items() if k in allowed_fields}
     return crud_user.update(db, db_obj=current_user, obj_in=filtered_data)
+
+
+@router.post("/me/avatar", response_model=FileUploadResponse)
+def upload_current_user_avatar(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    result = minio_service.upload_file(file, prefix=f"avatars/{current_user.id}")
+    current_user.avatar_url = result["file_url"]
+    db.add(current_user)
+    db.commit()
+    db.refresh(current_user)
+    return result
 
 
 @router.post("/me/password", response_model=ResponseMsg)

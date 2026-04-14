@@ -14,6 +14,7 @@ from app.models.contract import Contract
 from app.models.user import User
 from app.services.invoice_service import invoice_service
 from app.services.minio_service import minio_service
+from app.services.notification_service import notification_service
 from app.utils.data_scope import apply_data_scope, check_data_scope
 from app.utils.pagination import make_page_response
 from app.utils.excel_export import export_excel_response
@@ -123,7 +124,41 @@ def update_invoice(
         raise NotFoundError("发票")
     if not check_data_scope(invoice, current_user):
         raise PermissionDeniedError()
-    return crud_invoice.update(db, db_obj=invoice, obj_in=body)
+    old_status = invoice.status
+    updated = crud_invoice.update(db, db_obj=invoice, obj_in=body)
+    if body.status is not None and body.status != old_status and updated.applied_by is not None:
+        contract_title = updated.contract.title if updated.contract else ""
+        contract_no = updated.contract.contract_no if updated.contract else ""
+        customer_name = updated.contract.customer.name if updated.contract and updated.contract.customer else ""
+        amount_str = format(updated.amount, ".2f") if updated.amount is not None else "0.00"
+        tax_str = format(updated.tax_amount, ".2f") if updated.tax_amount is not None else "0.00"
+        invoice_date = updated.invoice_date.isoformat() if updated.invoice_date else "未填写"
+        customer_line = f"客户：{customer_name}\n" if customer_name else ""
+        if body.status == InvoiceStatus.ISSUED:
+            notification_service.create(
+                db,
+                user_id=updated.applied_by,
+                title="发票已开具",
+                content=(
+                    f"发票 {updated.invoice_no} 已开具。\n"
+                    f"合同：{contract_title}（{contract_no}）\n"
+                    f"{customer_line}"
+                    f"开票日期：{invoice_date}，金额：{amount_str} 元，税额：{tax_str} 元。"
+                ),
+            )
+        elif body.status == InvoiceStatus.SENT:
+            notification_service.create(
+                db,
+                user_id=updated.applied_by,
+                title="发票已寄出",
+                content=(
+                    f"发票 {updated.invoice_no} 已寄出。\n"
+                    f"合同：{contract_title}（{contract_no}）\n"
+                    f"{customer_line}"
+                    f"开票日期：{invoice_date}，金额：{amount_str} 元，税额：{tax_str} 元。"
+                ),
+            )
+    return updated
 
 
 @router.post("/{invoice_id}/upload", response_model=FileUploadResponse)

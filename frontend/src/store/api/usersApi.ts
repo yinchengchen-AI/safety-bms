@@ -20,6 +20,18 @@ export const usersApi = baseApi.injectEndpoints({
       query: (body) => ({ url: '/users/me', method: 'PATCH', body }),
       invalidatesTags: ['User'],
     }),
+    uploadAvatar: builder.mutation<{ file_url: string; file_name: string; file_size: number }, File>({
+      query: (file) => {
+        const formData = new FormData()
+        formData.append('file', file)
+        return {
+          url: '/users/me/avatar',
+          method: 'POST',
+          body: formData,
+        }
+      },
+      invalidatesTags: ['User'],
+    }),
     changePassword: builder.mutation<{ message: string }, { old_password: string; new_password: string }>({
       query: (body) => ({ url: '/users/me/password', method: 'POST', body }),
     }),
@@ -53,6 +65,7 @@ export const {
   useLogoutMutation,
   useGetMeQuery,
   useUpdateMeMutation,
+  useUploadAvatarMutation,
   useChangePasswordMutation,
   useListUsersQuery,
   useCreateUserMutation,

@@ -168,21 +168,45 @@ def update_contract_status(
         db, db_obj=contract, new_status=body.status, changed_by=current_user.id, remark=body.remark or ""
     )
     creator = db.query(User).filter(User.id == contract.created_by).first()
+    customer_name = contract.customer.name if contract.customer else ""
+    customer_line = f"客户：{customer_name}\n" if customer_name else ""
     if creator and creator.id != current_user.id:
+        total_str = format(contract.total_amount, ".2f") if contract.total_amount is not None else "0.00"
         if body.status == ContractStatus.ACTIVE:
             notification_service.create(
                 db,
                 user_id=creator.id,
                 title="合同审核通过",
-                content=f"您的合同 {contract.title} 已通过审核。",
+                content=(
+                    f"您的合同 {contract.title}（{contract.contract_no}）已通过审核。\n"
+                    f"{customer_line}"
+                    f"合同总金额：{total_str} 元。"
+                ),
             )
         elif old_status == ContractStatus.REVIEW and body.status == ContractStatus.DRAFT:
+            remark_text = f"备注：{body.remark}" if body.remark else ""
             notification_service.create(
                 db,
                 user_id=creator.id,
                 title="合同审核被驳回",
-                content=f"您的合同 {contract.title} 审核未通过，已退回草稿。",
+                content=(
+                    f"您的合同 {contract.title}（{contract.contract_no}）审核未通过，已退回草稿。\n"
+                    f"{customer_line}"
+                    f"合同总金额：{total_str} 元。{remark_text}"
+                ).strip(),
             )
+    if creator and body.status == ContractStatus.TERMINATED:
+        total_str = format(contract.total_amount, ".2f") if contract.total_amount is not None else "0.00"
+        notification_service.create(
+            db,
+            user_id=creator.id,
+            title="合同已终止",
+            content=(
+                f"您的合同 {contract.title}（{contract.contract_no}）已终止。\n"
+                f"{customer_line}"
+                f"合同总金额：{total_str} 元。"
+            ),
+        )
     return updated
 
 

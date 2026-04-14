@@ -13,6 +13,7 @@ from app.models.payment import Payment
 from app.models.contract import Contract
 from app.models.user import User
 from app.services.payment_service import payment_service
+from app.services.notification_service import notification_service
 from app.services.minio_service import minio_service
 from app.utils.data_scope import apply_data_scope, check_data_scope
 from app.utils.pagination import make_page_response
@@ -94,7 +95,26 @@ def create_payment(
     current_user: User = Depends(require_permissions(PermissionCode.PAYMENT_CREATE)),
     db: Session = Depends(get_db),
 ):
-    return payment_service.create_payment(db, obj_in=body, created_by=current_user.id)
+    payment = payment_service.create_payment(db, obj_in=body, created_by=current_user.id)
+    contract = db.query(Contract).filter(Contract.id == payment.contract_id).first()
+    if contract is not None and contract.created_by is not None:
+        payment_date = payment.payment_date.isoformat() if payment.payment_date else "未填写"
+        method_map = {"bank_transfer": "银行转账", "cash": "现金", "check": "支票"}
+        method_label = method_map.get(payment.payment_method.value, payment.payment_method.value) if payment.payment_method else "未知方式"
+        customer_name = contract.customer.name if contract.customer else ""
+        customer_line = f"客户：{customer_name}\n" if customer_name else ""
+        notification_service.create(
+            db,
+            user_id=contract.created_by,
+            title="新增收款记录",
+            content=(
+                f"合同 {contract.title}（{contract.contract_no}）新增一笔收款。\n"
+                f"{customer_line}"
+                f"收款编号：{payment.payment_no}，金额：{format(payment.amount, '.2f')} 元，"
+                f"收款日期：{payment_date}，收款方式：{method_label}。"
+            ),
+        )
+    return payment
 
 
 @router.get("/overdue", response_model=list[ContractReceivable])
