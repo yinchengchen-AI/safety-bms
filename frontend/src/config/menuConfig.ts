@@ -2,6 +2,7 @@ import type { ComponentType } from 'react'
 import type { AntdIconProps } from '@ant-design/icons/lib/components/AntdIcon'
 import {
   DashboardOutlined,
+  BarChartOutlined,
   TeamOutlined,
   FileTextOutlined,
   ToolOutlined,
@@ -24,6 +25,7 @@ export interface MenuItem {
 
 export const menuConfig: MenuItem[] = [
   { key: '/', icon: DashboardOutlined, label: '仪表盘', path: '/', requiredPermissions: ['dashboard:read'] },
+  { key: '/analytics', icon: BarChartOutlined, label: '统计分析', path: '/analytics', requiredPermissions: ['analytics:read'] },
   { key: '/customers', icon: TeamOutlined, label: '客户管理', path: '/customers', requiredPermissions: ['customer:read'] },
   { key: '/contracts', icon: FileTextOutlined, label: '合同管理', path: '/contracts', requiredPermissions: ['contract:read'] },
   { key: '/contract-templates', icon: FileTextOutlined, label: '合同模板', path: '/contract-templates', requiredPermissions: ['contract:read'] },

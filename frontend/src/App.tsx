@@ -10,6 +10,7 @@ import AuthInitializer from '@/components/auth/AuthInitializer'
 import ErrorBoundary from '@/components/common/ErrorBoundary'
 import Login from '@/pages/Login'
 import Dashboard from '@/pages/Dashboard'
+import Analytics from '@/pages/Analytics'
 import Customers from '@/pages/Customers'
 import Contracts from '@/pages/Contracts'
 import ContractTemplates from '@/pages/ContractTemplates'
@@ -36,6 +37,7 @@ const App = () => {
               <Route element={<PrivateRoute />}>
                 <Route element={<AppLayout />}>
                   <Route path="/" element={<Dashboard />} />
+                  <Route path="/analytics/*" element={<Analytics />} />
                   <Route path="/customers/*" element={<Customers />} />
                   <Route path="/contracts/*" element={<Contracts />} />
                   <Route path="/contract-templates/*" element={<ContractTemplates />} />

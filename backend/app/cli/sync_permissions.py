@@ -54,6 +54,7 @@ PERMISSIONS = [
     {"code": PermissionCode.DEPARTMENT_DELETE, "name": "部门删除"},
     {"code": PermissionCode.DEPARTMENT_EXPORT, "name": "部门导出"},
     {"code": PermissionCode.DASHBOARD_READ, "name": "仪表盘查看"},
+    {"code": PermissionCode.ANALYTICS_READ, "name": "分析查看"},
 ]
 
 

@@ -1,3 +1,33 @@
-from app.api.v1.endpoints import auth, users, roles, departments, customers, contracts, services, invoices, payments, dashboard, contract_templates, notifications, permissions
+from app.api.v1.endpoints import (
+    analytics,
+    auth,
+    users,
+    roles,
+    departments,
+    customers,
+    contracts,
+    services,
+    invoices,
+    payments,
+    dashboard,
+    contract_templates,
+    notifications,
+    permissions,
+)
 
-__all__ = ["auth", "users", "roles", "departments", "customers", "contracts", "services", "invoices", "payments", "dashboard", "contract_templates", "notifications", "permissions"]
+__all__ = [
+    "analytics",
+    "auth",
+    "users",
+    "roles",
+    "departments",
+    "customers",
+    "contracts",
+    "services",
+    "invoices",
+    "payments",
+    "dashboard",
+    "contract_templates",
+    "notifications",
+    "permissions",
+]

@@ -53,69 +53,71 @@ class PermissionCode(str, Enum):
     DEPARTMENT_EXPORT = "department:export"
     # dashboard
     DASHBOARD_READ = "dashboard:read"
+    ANALYTICS_READ = "analytics:read"
 
 
 class DataScope(str, Enum):
-    ALL = "ALL"   # 全部数据
-    DEPT = "DEPT" # 本部门数据
-    SELF = "SELF" # 仅本人数据
+    ALL = "ALL"  # 全部数据
+    DEPT = "DEPT"  # 本部门数据
+    SELF = "SELF"  # 仅本人数据
 
 
 class UserRole(str, Enum):
-    ADMIN = "admin"           # 系统管理员
-    SALES = "sales"           # 销售
-    SERVICE = "service"       # 服务人员
-    FINANCE = "finance"       # 财务
-    VIEWER = "viewer"         # 只读查看
+    ADMIN = "admin"  # 系统管理员
+    SALES = "sales"  # 销售
+    SERVICE = "service"  # 服务人员
+    FINANCE = "finance"  # 财务
+    VIEWER = "viewer"  # 只读查看
 
 
 class CustomerStatus(str, Enum):
-    PROSPECT = "prospect"     # 意向
-    SIGNED = "signed"         # 成交
-    CHURNED = "churned"       # 流失
+    PROSPECT = "prospect"  # 意向
+    SIGNED = "signed"  # 成交
+    CHURNED = "churned"  # 流失
 
 
 class ContractStatus(str, Enum):
-    DRAFT = "draft"           # 草稿
-    REVIEW = "review"         # 审核中
-    ACTIVE = "active"         # 生效
-    SIGNED = "signed"         # 已签订
-    COMPLETED = "completed"   # 完成
-    TERMINATED = "terminated" # 终止
+    DRAFT = "draft"  # 草稿
+    REVIEW = "review"  # 审核中
+    ACTIVE = "active"  # 生效
+    SIGNED = "signed"  # 已签订
+    COMPLETED = "completed"  # 完成
+    TERMINATED = "terminated"  # 终止
 
 
 class ServiceType(str, Enum):
-    EVALUATION = "evaluation"         # 安全评价
-    TRAINING = "training"             # 安全培训
-    INSPECTION = "inspection"         # 安全检测检验
-    CONSULTING = "consulting"         # 安全咨询顾问
-    EMERGENCY_PLAN = "emergency_plan" # 应急预案编制
+    EVALUATION = "evaluation"  # 安全评价
+    TRAINING = "training"  # 安全培训
+    INSPECTION = "inspection"  # 安全检测检验
+    CONSULTING = "consulting"  # 安全咨询顾问
+    EMERGENCY_PLAN = "emergency_plan"  # 应急预案编制
 
 
 class ServiceOrderStatus(str, Enum):
-    PENDING = "pending"           # 待开始
-    IN_PROGRESS = "in_progress"   # 进行中
-    COMPLETED = "completed"        # 已完成
-    ACCEPTED = "accepted"          # 已验收
+    PENDING = "pending"  # 待开始
+    IN_PROGRESS = "in_progress"  # 进行中
+    COMPLETED = "completed"  # 已完成
+    ACCEPTED = "accepted"  # 已验收
 
 
 class InvoiceType(str, Enum):
-    SPECIAL = "special"   # 增值税专用发票
-    GENERAL = "general"   # 增值税普通发票
+    SPECIAL = "special"  # 增值税专用发票
+    GENERAL = "general"  # 增值税普通发票
 
 
 class InvoiceStatus(str, Enum):
-    APPLYING = "applying"   # 申请中
-    ISSUED = "issued"       # 已开票
-    SENT = "sent"           # 已寄出
+    APPLYING = "applying"  # 申请中
+    ISSUED = "issued"  # 已开票
+    SENT = "sent"  # 已寄出
+    REJECTED = "rejected"  # 已拒绝
 
 
 class PaymentMethod(str, Enum):
-    BANK_TRANSFER = "bank_transfer"   # 银行转账
-    CASH = "cash"                     # 现金
-    CHECK = "check"                   # 支票
+    BANK_TRANSFER = "bank_transfer"  # 银行转账
+    CASH = "cash"  # 现金
+    CHECK = "check"  # 支票
 
 
 class PaymentPlan(str, Enum):
-    ONCE = "once"         # 一次性
+    ONCE = "once"  # 一次性
     INSTALLMENT = "installment"  # 分期

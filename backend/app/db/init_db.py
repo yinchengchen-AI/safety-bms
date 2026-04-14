@@ -35,6 +35,7 @@ ROLE_DEFAULT_PERMISSIONS = {
         PermissionCode.SERVICE_DELETE,
         PermissionCode.SERVICE_EXPORT,
         PermissionCode.DASHBOARD_READ,
+        PermissionCode.ANALYTICS_READ,
     ],
     UserRoleEnum.SERVICE: [
         PermissionCode.SERVICE_READ,
@@ -45,6 +46,7 @@ ROLE_DEFAULT_PERMISSIONS = {
         PermissionCode.CONTRACT_READ,
         PermissionCode.CUSTOMER_READ,
         PermissionCode.DASHBOARD_READ,
+        PermissionCode.ANALYTICS_READ,
     ],
     UserRoleEnum.FINANCE: [
         PermissionCode.INVOICE_READ,
@@ -59,6 +61,7 @@ ROLE_DEFAULT_PERMISSIONS = {
         PermissionCode.PAYMENT_EXPORT,
         PermissionCode.CONTRACT_READ,
         PermissionCode.DASHBOARD_READ,
+        PermissionCode.ANALYTICS_READ,
     ],
     UserRoleEnum.VIEWER: [
         PermissionCode.CUSTOMER_READ,
@@ -67,6 +70,7 @@ ROLE_DEFAULT_PERMISSIONS = {
         PermissionCode.INVOICE_READ,
         PermissionCode.PAYMENT_READ,
         PermissionCode.DASHBOARD_READ,
+        PermissionCode.ANALYTICS_READ,
     ],
 }
 

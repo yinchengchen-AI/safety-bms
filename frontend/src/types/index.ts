@@ -16,7 +16,7 @@ export type ContractStatus = 'draft' | 'review' | 'active' | 'signed' | 'complet
 export type ServiceType = 'evaluation' | 'training' | 'inspection' | 'consulting' | 'emergency_plan'
 export type ServiceOrderStatus = 'pending' | 'in_progress' | 'completed' | 'accepted'
 export type InvoiceType = 'special' | 'general'
-export type InvoiceStatus = 'applying' | 'issued' | 'sent'
+export type InvoiceStatus = 'applying' | 'issued' | 'sent' | 'rejected'
 export type PaymentMethod = 'bank_transfer' | 'cash' | 'check'
 export type PaymentPlan = 'once' | 'installment'
 
@@ -380,4 +380,112 @@ export interface DashboardStats {
   contract_amount_by_service_type: { service_type: string; total_amount: number }[]
   top_performers: { user_id: number; full_name: string; total_amount: number }[]
   monthly_new_service_orders: number
+}
+
+export interface AnalyticsOverview {
+  signed_amount: number
+  invoiced_amount: number
+  received_amount: number
+  collection_rate: number
+  receivable_balance: number
+  overdue_contract_count: number
+}
+
+export interface RevenueTrendItem {
+  period: string
+  signed_amount: number
+  invoiced_amount: number
+  received_amount: number
+  receivable_balance: number
+}
+
+export interface RevenueTrendResponse {
+  items: RevenueTrendItem[]
+}
+
+export interface PerformanceRankingItem {
+  user_id?: number
+  full_name: string
+  signed_amount: number
+  invoiced_amount: number
+  received_amount: number
+}
+
+export interface PerformanceRankingResponse {
+  items: PerformanceRankingItem[]
+}
+
+export interface ReceivableAgingBucket {
+  range: string
+  contract_count: number
+  amount: number
+}
+
+export interface RiskContract {
+  contract_id: number
+  contract_no: string
+  customer_name?: string
+  end_date?: string
+  receivable_amount: number
+  overdue_days: number
+}
+
+export interface ReceivableAgingResponse {
+  buckets: ReceivableAgingBucket[]
+  risk_contracts: RiskContract[]
+}
+
+export interface CustomerGrowthItem {
+  period: string
+  new_customers: number
+}
+
+export interface CustomerIndustryDistributionItem {
+  industry: string
+  count: number
+}
+
+export interface CustomerStatusDistributionItem {
+  status: string
+  count: number
+}
+
+export interface CustomerInsightsResponse {
+  growth_trend: CustomerGrowthItem[]
+  industry_distribution: CustomerIndustryDistributionItem[]
+  status_distribution: CustomerStatusDistributionItem[]
+}
+
+export interface ServiceEfficiencyTrendItem {
+  period: string
+  new_orders: number
+  completed_orders: number
+  on_time_rate: number
+  overdue_orders: number
+}
+
+export interface ServiceTypeDistributionItem {
+  service_type: string
+  order_count: number
+}
+
+export interface ServiceEfficiencyResponse {
+  trend: ServiceEfficiencyTrendItem[]
+  service_type_distribution: ServiceTypeDistributionItem[]
+}
+
+export interface AnalyticsDrilldownItem {
+  id: number
+  category: string
+  primary_label: string
+  secondary_label?: string
+  amount?: number
+  date_label?: string
+  status?: string
+  extra?: string
+}
+
+export interface AnalyticsDrilldownResponse {
+  total: number
+  items: AnalyticsDrilldownItem[]
 }
