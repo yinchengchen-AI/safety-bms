@@ -25,6 +25,24 @@ from app.utils.excel_export import export_excel_response
 router = APIRouter(prefix="/contracts", tags=["合同管理"])
 
 
+def _enrich_contract_out(contract, out: ContractOut) -> ContractOut:
+    out.customer_name = contract.customer.name if contract.customer else None
+    if contract.service_type_obj:
+        out.service_type_id = contract.service_type_obj.id
+        out.service_type_name = contract.service_type_obj.name
+        out.service_type_code = contract.service_type_obj.code
+    return out
+
+
+def _enrich_contract_list_out(contract, out: ContractListOut) -> ContractListOut:
+    out.customer_name = contract.customer.name if contract.customer else None
+    if contract.service_type_obj:
+        out.service_type_id = contract.service_type_obj.id
+        out.service_type_name = contract.service_type_obj.name
+        out.service_type_code = contract.service_type_obj.code
+    return out
+
+
 @router.get("", response_model=PageResponse[ContractListOut])
 def list_contracts(
     page: int = Query(1, ge=1),
@@ -57,7 +75,7 @@ def list_contracts(
     result = []
     for c in items:
         item = ContractListOut.model_validate(c)
-        item.customer_name = c.customer.name if c.customer else None
+        _enrich_contract_list_out(c, item)
         result.append(item)
     return make_page_response(total, result, page, page_size)
 
@@ -84,7 +102,7 @@ def export_contracts(
     for c in items:
         rows.append([
             c.contract_no, c.title, c.customer.name if c.customer else "",
-            c.service_type.value if c.service_type else "", str(c.total_amount) if c.total_amount is not None else "",
+            c.service_type_obj.name if c.service_type_obj else "", str(c.total_amount) if c.total_amount is not None else "",
             c.sign_date.strftime("%Y-%m-%d") if c.sign_date else "",
             c.start_date.strftime("%Y-%m-%d") if c.start_date else "",
             c.end_date.strftime("%Y-%m-%d") if c.end_date else "",
@@ -115,7 +133,7 @@ def get_contract(
     if not check_data_scope(contract, current_user):
         raise BusinessError("无权查看该记录", status_code=403)
     result = ContractOut.model_validate(contract)
-    result.customer_name = contract.customer.name if contract.customer else None
+    _enrich_contract_out(contract, result)
     result.invoiced_amount = crud_contract.get_invoiced_amount(db, contract_id=contract_id)
     result.received_amount = crud_contract.get_received_amount(db, contract_id=contract_id)
     return result

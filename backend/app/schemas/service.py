@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from datetime import datetime, date
 from decimal import Decimal
 
-from app.core.constants import ServiceOrderStatus, ServiceType
+from app.core.constants import ServiceOrderStatus
 
 
 class ServiceItemBase(BaseModel):
@@ -49,7 +49,7 @@ class ServiceOrderBase(BaseModel):
     order_no: str
     contract_id: int
     title: str
-    service_type: ServiceType
+    service_type: int
     assignee_id: Optional[int] = None
     planned_start: Optional[date] = None
     planned_end: Optional[date] = None
@@ -84,6 +84,9 @@ class ServiceOrderOut(ServiceOrderBase):
     assignee_name: Optional[str] = None
     items: List[ServiceItemOut] = []
     reports: List[ServiceReportOut] = []
+    service_type_id: int
+    service_type_name: Optional[str] = None
+    service_type_code: Optional[str] = None
 
     model_config = {"from_attributes": True}
 
@@ -94,7 +97,10 @@ class ServiceOrderListOut(BaseModel):
     title: str
     contract_id: int
     customer_name: Optional[str] = None
-    service_type: ServiceType
+    service_type: int
+    service_type_id: int
+    service_type_name: Optional[str] = None
+    service_type_code: Optional[str] = None
     status: ServiceOrderStatus
     assignee_id: Optional[int] = None
     assignee_name: Optional[str] = None

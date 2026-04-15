@@ -2,7 +2,7 @@ from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Nume
 from sqlalchemy.orm import relationship
 
 from app.db.base import Base, TimestampMixin
-from app.core.constants import ServiceOrderStatus, ServiceType
+from app.core.constants import ServiceOrderStatus
 
 
 class ServiceOrder(Base, TimestampMixin):
@@ -13,7 +13,11 @@ class ServiceOrder(Base, TimestampMixin):
     contract_id = Column(Integer, ForeignKey("contracts.id", ondelete="RESTRICT"), nullable=False)
     assignee_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, comment="负责人")
     title = Column(String(300), nullable=False)
-    service_type = Column(SAEnum(ServiceType, name="service_type_order", create_constraint=False), nullable=False)
+    service_type = Column(
+        Integer,
+        ForeignKey("service_types.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
     status = Column(
         SAEnum(ServiceOrderStatus, name="service_order_status"),
         default=ServiceOrderStatus.PENDING,
@@ -26,6 +30,7 @@ class ServiceOrder(Base, TimestampMixin):
     remark = Column(Text)
 
     contract = relationship("Contract", back_populates="service_orders")
+    service_type_obj = relationship("ServiceType")
     assignee = relationship("User", back_populates="service_orders", foreign_keys=[assignee_id])
     items = relationship("ServiceItem", back_populates="order", cascade="all, delete-orphan")
     reports = relationship("ServiceReport", back_populates="order", cascade="all, delete-orphan")

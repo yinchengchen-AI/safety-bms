@@ -4,6 +4,7 @@ from app.models.contract import Contract, ContractChange
 from app.models.service import ServiceOrder, ServiceItem, ServiceReport
 from app.models.invoice import Invoice
 from app.models.payment import Payment
+from app.models.service_type import ServiceType
 
 __all__ = [
     "User", "Role", "UserRole",
@@ -12,4 +13,5 @@ __all__ = [
     "ServiceOrder", "ServiceItem", "ServiceReport",
     "Invoice",
     "Payment",
+    "ServiceType",
 ]
