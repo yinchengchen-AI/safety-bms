@@ -69,10 +69,10 @@ class ContractTemplateOut(BaseModel):
     id: int
     name: str
     service_type: int
-    service_type_id: int
+    service_type_id: Optional[int] = None
     service_type_name: Optional[str] = None
     service_type_code: Optional[str] = None
-    file_url: str
+    file_url: Optional[str] = None
     is_default: bool
     created_at: datetime
 

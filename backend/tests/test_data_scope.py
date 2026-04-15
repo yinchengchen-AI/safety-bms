@@ -52,14 +52,29 @@ def _create_customer(created_by: int, dept_id: int | None = None):
     return c
 
 
+def _get_or_create_service_type_id() -> int:
+    db = _make_db()
+    from app.models.service_type import ServiceType as ServiceTypeModel
+    st = db.query(ServiceTypeModel).filter(ServiceTypeModel.is_active == True).first()
+    if st:
+        db.close()
+        return st.id
+    st = ServiceTypeModel(code="evaluation", name="安全评价", is_active=True)
+    db.add(st)
+    db.commit()
+    db.refresh(st)
+    db.close()
+    return st.id
+
+
 def _create_contract(created_by: int, customer_id: int, total_amount: float = 10000):
     db = _make_db()
-    from app.core.constants import ContractStatus, ServiceType, PaymentPlan
+    from app.core.constants import ContractStatus, PaymentPlan
     c = Contract(
         contract_no=f"C-{created_by}-{customer_id}",
         title="Test Contract",
         customer_id=customer_id,
-        service_type=ServiceType.EVALUATION,
+        service_type=_get_or_create_service_type_id(),
         total_amount=total_amount,
         status=ContractStatus.DRAFT,
         created_by=created_by,
@@ -73,12 +88,12 @@ def _create_contract(created_by: int, customer_id: int, total_amount: float = 10
 
 def _create_service_order(contract_id: int, assignee_id: int | None = None):
     db = _make_db()
-    from app.core.constants import ServiceOrderStatus, ServiceType
+    from app.core.constants import ServiceOrderStatus
     o = ServiceOrder(
         order_no=f"S-{contract_id}",
         contract_id=contract_id,
         title="Test Order",
-        service_type=ServiceType.EVALUATION,
+        service_type=_get_or_create_service_type_id(),
         status=ServiceOrderStatus.PENDING,
         assignee_id=assignee_id,
     )

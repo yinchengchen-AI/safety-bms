@@ -23,8 +23,11 @@ def _create_user_with_perms(username: str, permission_codes: list):
 
     for code in permission_codes:
         perm = db.query(Permission).filter(Permission.code == code).first()
-        if perm:
-            role.permissions.append(perm)
+        if not perm:
+            perm = Permission(code=code, name=code, description=code)
+            db.add(perm)
+            db.flush()
+        role.permissions.append(perm)
 
     user = User(
         username=username,
