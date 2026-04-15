@@ -3,14 +3,14 @@ from pydantic import BaseModel, model_validator
 from datetime import datetime, date
 from decimal import Decimal
 
-from app.core.constants import ContractStatus, ServiceType, PaymentPlan
+from app.core.constants import ContractStatus, PaymentPlan
 
 
 class ContractBase(BaseModel):
     contract_no: str
     title: str
     customer_id: int
-    service_type: ServiceType
+    service_type: int
     total_amount: Decimal
     payment_plan: PaymentPlan = PaymentPlan.ONCE
     start_date: Optional[date] = None
@@ -61,14 +61,17 @@ class ContractStatusUpdate(BaseModel):
 
 class ContractTemplateCreate(BaseModel):
     name: str
-    service_type: ServiceType
+    service_type: int
     is_default: bool = False
 
 
 class ContractTemplateOut(BaseModel):
     id: int
     name: str
-    service_type: ServiceType
+    service_type: int
+    service_type_id: int
+    service_type_name: Optional[str] = None
+    service_type_code: Optional[str] = None
     file_url: str
     is_default: bool
     created_at: datetime
@@ -128,6 +131,9 @@ class ContractOut(ContractBase):
     # 统计字段（由service层计算）
     invoiced_amount: Optional[Decimal] = None
     received_amount: Optional[Decimal] = None
+    service_type_id: int
+    service_type_name: Optional[str] = None
+    service_type_code: Optional[str] = None
 
     model_config = {"from_attributes": True}
 
@@ -138,7 +144,10 @@ class ContractListOut(BaseModel):
     title: str
     customer_id: int
     customer_name: Optional[str] = None
-    service_type: ServiceType
+    service_type: int
+    service_type_id: int
+    service_type_name: Optional[str] = None
+    service_type_code: Optional[str] = None
     total_amount: Decimal
     payment_plan: PaymentPlan
     status: ContractStatus
