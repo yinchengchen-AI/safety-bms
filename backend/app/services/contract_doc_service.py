@@ -7,6 +7,9 @@ from docxtpl import DocxTemplate
 from docx import Document
 from docx.shared import Inches
 
+import logging
+
+from app.models.contract import ContractTemplate
 from app.services.minio_service import minio_service
 
 
@@ -274,7 +277,12 @@ def number_to_chinese_upper(amount) -> str:
 
         if low > 0:
             low_str = _four_digit_to_chinese(low)
-            if mid > 0 and len(str(low)) < 4 and not low_str.startswith("零"):
+            need_pad = False
+            if mid > 0 and len(str(low)) < 4:
+                need_pad = True
+            elif high > 0 and mid == 0 and len(str(low)) < 4:
+                need_pad = True
+            if need_pad:
                 low_str = "零" + low_str
             parts.append(low_str)
 
@@ -301,3 +309,77 @@ def number_to_chinese_upper(amount) -> str:
             result += nums[fen] + "分"
 
     return result
+
+
+def _build_standard_contract_context(contract) -> dict:
+    customer = contract.customer
+    sign_date = contract.sign_date
+    start_date = contract.start_date
+    end_date = contract.end_date
+
+    sign_location = ""
+    if customer:
+        sign_location = f"{customer.city or ''}{customer.district or ''}"
+
+    total_amount = contract.total_amount or 0
+
+    return {
+        "contract_reg_no": contract.contract_no or "",
+        "party_a_name": customer.name if customer else "",
+        "sign_location": sign_location,
+        "sign_year": sign_date.year if sign_date else "",
+        "sign_month": sign_date.month if sign_date else "",
+        "sign_day": sign_date.day if sign_date else "",
+        "valid_start_year": start_date.year if start_date else "",
+        "valid_start_month": start_date.month if start_date else "",
+        "valid_start_day": start_date.day if start_date else "",
+        "valid_end_year": end_date.year if end_date else "",
+        "valid_end_month": end_date.month if end_date else "",
+        "valid_end_day": end_date.day if end_date else "",
+        "service_start_year": start_date.year if start_date else "",
+        "service_start_month": start_date.month if start_date else "",
+        "service_start_day": start_date.day if start_date else "",
+        "service_end_year": end_date.year if end_date else "",
+        "service_end_month": end_date.month if end_date else "",
+        "service_end_day": end_date.day if end_date else "",
+        "total_amount": str(total_amount),
+        "total_amount_upper": number_to_chinese_upper(total_amount),
+        "payment_amount": str(total_amount),
+        "service_address": customer.address if customer else "",
+    }
+
+
+def render_standard_contract_draft(contract, db) -> str | None:
+    logger = logging.getLogger(__name__)
+
+    template = db.query(ContractTemplate).filter(ContractTemplate.is_default == True).first()
+    if not template or not template.file_url:
+        logger.warning("未找到默认合同模板，跳过标准合同草稿生成")
+        return None
+
+    try:
+        template_bytes = _download_minio_file(template.file_url)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            template_path = Path(tmpdir) / "template.docx"
+            template_path.write_bytes(template_bytes)
+
+            doc = DocxTemplate(str(template_path))
+            context = _build_standard_contract_context(contract)
+            doc.render(context)
+
+            output_path = Path(tmpdir) / "standard_draft.docx"
+            doc.save(str(output_path))
+
+            draft_bytes = output_path.read_bytes()
+
+        draft_object_name = f"contracts/{contract.id}/standard_drafts/{uuid.uuid4().hex}.docx"
+        _upload_bytes_to_minio(
+            draft_bytes,
+            draft_object_name,
+            content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        )
+        return draft_object_name
+    except Exception:
+        logger.exception("标准合同草稿生成失败")
+        return None
