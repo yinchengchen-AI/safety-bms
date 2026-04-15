@@ -4,15 +4,16 @@ import type { UploadProps } from 'antd'
 import { PlusOutlined, DeleteOutlined, EditOutlined, UploadOutlined, DownloadOutlined } from '@ant-design/icons'
 import { useListServiceOrdersQuery, useCreateServiceOrderMutation, useUpdateServiceStatusMutation, useGetServiceOrderQuery, useUpdateServiceOrderMutation, useDeleteServiceOrderMutation, useCreateServiceItemMutation, useUpdateServiceItemMutation, useDeleteServiceItemMutation, useDeleteServiceReportMutation } from '@/store/api/servicesApi'
 import { useListContractsQuery } from '@/store/api/contractsApi'
-import { ServiceTypeLabels, ServiceOrderStatusLabels } from '@/utils/constants'
-import type { ServiceOrder, ServiceOrderStatus, ServiceType, ServiceItem, ServiceReport } from '@/types'
+import { ServiceOrderStatusLabels } from '@/utils/constants'
+import type { ServiceOrder, ServiceOrderStatus, ServiceItem, ServiceReport } from '@/types'
 import dayjs from 'dayjs'
 import type { Dayjs } from 'dayjs'
+import { useListServiceTypesQuery } from '@/store/api/serviceTypesApi'
 
 interface ServiceFormValues {
   order_no: string
   contract_id: number
-  service_type: ServiceType
+  service_type: number
   title: string
   planned_start?: Dayjs
   planned_end?: Dayjs
@@ -47,6 +48,17 @@ const Services: React.FC = () => {
   const [updateServiceOrder] = useUpdateServiceOrderMutation()
   const [deleteServiceOrder] = useDeleteServiceOrderMutation()
   const [updateStatus] = useUpdateServiceStatusMutation()
+  const { data: serviceTypesData } = useListServiceTypesQuery({ page_size: 200 })
+
+  const serviceTypeMap = React.useMemo(() => {
+    const map = new Map<number, string>()
+    serviceTypesData?.items?.forEach((st) => map.set(st.id, st.name))
+    return map
+  }, [serviceTypesData])
+
+  const serviceTypeOptions = React.useMemo(() => {
+    return serviceTypesData?.items?.map((st) => ({ value: st.id, label: st.name })) || []
+  }, [serviceTypesData])
 
   const handleCreate = async (values: ServiceFormValues) => {
     const payload = {
@@ -95,7 +107,7 @@ const Services: React.FC = () => {
     { title: '工单编号', dataIndex: 'order_no', key: 'order_no', render: (no: string, r: ServiceOrder) => (
       <Button type="link" onClick={() => setDetailId(r.id)}>{no}</Button>
     )},
-    { title: '服务类型', dataIndex: 'service_type', key: 'service_type', render: (s: string) => ServiceTypeLabels[s as keyof typeof ServiceTypeLabels] },
+    { title: '服务类型', dataIndex: 'service_type', key: 'service_type', render: (s: number) => serviceTypeMap.get(s) || s },
     { title: '客户', dataIndex: 'customer_name', key: 'customer_name' },
     { title: '负责人', dataIndex: 'assignee_name', key: 'assignee_name' },
     { title: '状态', dataIndex: 'status', key: 'status', render: (s: ServiceOrderStatus) => (
@@ -155,7 +167,7 @@ const Services: React.FC = () => {
               options={contractsData?.items.map(c => ({ value: c.id, label: `${c.contract_no} - ${c.title}` })) || []} />
           </Form.Item>
           <Form.Item name="service_type" label="服务类型" rules={[{ required: true }]}>
-            <Select options={Object.entries(ServiceTypeLabels).map(([v, l]) => ({ value: v, label: l }))} />
+            <Select options={serviceTypeOptions} />
           </Form.Item>
           <Form.Item name="title" label="工单标题" rules={[{ required: true }]}><Input /></Form.Item>
           <Form.Item name="planned_start" label="计划开始日期"><DatePicker style={{ width: '100%' }} /></Form.Item>
@@ -177,7 +189,7 @@ const Services: React.FC = () => {
               options={contractsData?.items.map(c => ({ value: c.id, label: `${c.contract_no} - ${c.title}` })) || []} />
           </Form.Item>
           <Form.Item name="service_type" label="服务类型" rules={[{ required: true }]}>
-            <Select options={Object.entries(ServiceTypeLabels).map(([v, l]) => ({ value: v, label: l }))} />
+            <Select options={serviceTypeOptions} />
           </Form.Item>
           <Form.Item name="title" label="工单标题" rules={[{ required: true }]}><Input /></Form.Item>
           <Form.Item name="planned_start" label="计划开始日期"><DatePicker style={{ width: '100%' }} /></Form.Item>
@@ -201,6 +213,12 @@ const ServiceDetail: React.FC<{ id: number; onClose: () => void }> = ({ id, onCl
   const [itemModalOpen, setItemModalOpen] = useState(false)
   const [editingItem, setEditingItem] = useState<ServiceItem | null>(null)
   const [itemForm] = Form.useForm()
+  const { data: serviceTypesData } = useListServiceTypesQuery({ page_size: 200 })
+  const serviceTypeMap = React.useMemo(() => {
+    const map = new Map<number, string>()
+    serviceTypesData?.items?.forEach((st) => map.set(st.id, st.name))
+    return map
+  }, [serviceTypesData])
 
   if (!data) return null
 
@@ -330,7 +348,7 @@ const ServiceDetail: React.FC<{ id: number; onClose: () => void }> = ({ id, onCl
           <Descriptions.Item label="工单编号">{data.order_no}</Descriptions.Item>
           <Descriptions.Item label="状态"><Tag color={statusColors[data.status]}>{ServiceOrderStatusLabels[data.status]}</Tag></Descriptions.Item>
           <Descriptions.Item label="工单标题" span={2}>{data.title}</Descriptions.Item>
-          <Descriptions.Item label="服务类型">{ServiceTypeLabels[data.service_type as keyof typeof ServiceTypeLabels]}</Descriptions.Item>
+          <Descriptions.Item label="服务类型">{serviceTypeMap.get(data.service_type) || data.service_type}</Descriptions.Item>
           <Descriptions.Item label="负责人">{data.assignee_name}</Descriptions.Item>
           <Descriptions.Item label="计划开始">{data.planned_start}</Descriptions.Item>
           <Descriptions.Item label="计划结束">{data.planned_end}</Descriptions.Item>

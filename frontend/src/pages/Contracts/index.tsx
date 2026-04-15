@@ -9,20 +9,21 @@ import {
 } from '@/store/api/contractsApi'
 import { useListContractTemplatesQuery } from '@/store/api/contractTemplatesApi'
 import { useListCustomersQuery } from '@/store/api/customersApi'
-import { ContractStatusLabels, ServiceTypeLabels, PaymentPlanLabels, formatAmount, generateBizNo } from '@/utils/constants'
+import { ContractStatusLabels, PaymentPlanLabels, formatAmount, generateBizNo } from '@/utils/constants'
 import { downloadExport } from '@/utils/export'
 import ContractSignModal from '@/components/ContractSignModal'
 import { selectCurrentUser } from '@/store/slices/authSlice'
-import type { Contract, ContractStatus, ServiceType, PaymentPlan } from '@/types'
+import type { Contract, ContractStatus, PaymentPlan } from '@/types'
 import dayjs from 'dayjs'
 import type { Dayjs } from 'dayjs'
 import { useSelector } from 'react-redux'
+import { useListServiceTypesQuery } from '@/store/api/serviceTypesApi'
 
 interface ContractFormValues {
   contract_no: string
   title: string
   customer_id: number
-  service_type: ServiceType
+  service_type: number
   total_amount: number
   payment_plan?: PaymentPlan
   template_id?: number
@@ -52,6 +53,17 @@ const Contracts: React.FC = () => {
   const [editForm] = Form.useForm()
   const [triggerPdfUrl] = useLazyGetContractPdfUrlQuery()
   const [generateDraft, { isLoading: generatingDraft }] = useGenerateContractDraftMutation()
+  const { data: serviceTypesData } = useListServiceTypesQuery({ page_size: 200 })
+
+  const serviceTypeMap = React.useMemo(() => {
+    const map = new Map<number, string>()
+    serviceTypesData?.items?.forEach((st) => map.set(st.id, st.name))
+    return map
+  }, [serviceTypesData])
+
+  const serviceTypeOptions = React.useMemo(() => {
+    return serviceTypesData?.items?.map((st) => ({ value: st.id, label: st.name })) || []
+  }, [serviceTypesData])
 
   const openPdfPreview = async (id: number) => {
     try {
@@ -191,7 +203,7 @@ const Contracts: React.FC = () => {
     )},
     { title: '合同名称', dataIndex: 'title', key: 'title', ellipsis: true },
     { title: '客户', dataIndex: 'customer_name', key: 'customer_name' },
-    { title: '服务类型', dataIndex: 'service_type', key: 'service_type', render: (s: ServiceType) => ServiceTypeLabels[s] },
+    { title: '服务类型', dataIndex: 'service_type', key: 'service_type', render: (s: number) => serviceTypeMap.get(s) || s },
     { title: '合同金额', dataIndex: 'total_amount', key: 'total_amount', render: formatAmount },
     { title: '状态', dataIndex: 'status', key: 'status', render: (s: ContractStatus) => (
       <Tag color={statusColors[s]}>{ContractStatusLabels[s]}</Tag>
@@ -267,7 +279,7 @@ const Contracts: React.FC = () => {
               options={customersData?.items.map(c => ({ value: c.id, label: c.name })) || []} />
           </Form.Item>
           <Form.Item name="service_type" label="服务类型" rules={[{ required: true }]}>
-            <Select options={Object.entries(ServiceTypeLabels).map(([v, l]) => ({ value: v, label: l }))}
+            <Select options={serviceTypeOptions}
               onChange={() => form.setFieldsValue({ template_id: undefined })} />
           </Form.Item>
           <Form.Item shouldUpdate={(prev, cur) => prev.service_type !== cur.service_type} noStyle>
@@ -319,7 +331,7 @@ const Contracts: React.FC = () => {
               options={customersData?.items.map(c => ({ value: c.id, label: c.name })) || []} />
           </Form.Item>
           <Form.Item name="service_type" label="服务类型" rules={[{ required: true }]}>
-            <Select options={Object.entries(ServiceTypeLabels).map(([v, l]) => ({ value: v, label: l }))}
+            <Select options={serviceTypeOptions}
               onChange={() => editForm.setFieldsValue({ template_id: undefined })} />
           </Form.Item>
           <Form.Item shouldUpdate={(prev, cur) => prev.service_type !== cur.service_type} noStyle>
@@ -392,6 +404,12 @@ const ContractDetail: React.FC<{
 }> = ({ id, onClose, onGenerateDraft, onOpenSign, onOpenPdf, onPrintPdf, generatingDraft }) => {
   const { data } = useGetContractQuery(id)
   const [updateStatus] = useUpdateContractStatusMutation()
+  const { data: serviceTypesData } = useListServiceTypesQuery({ page_size: 200 })
+  const serviceTypeMap = React.useMemo(() => {
+    const map = new Map<number, string>()
+    serviceTypesData?.items?.forEach((st) => map.set(st.id, st.name))
+    return map
+  }, [serviceTypesData])
   if (!data) return null
 
   return (
@@ -424,7 +442,7 @@ const ContractDetail: React.FC<{
         <Descriptions.Item label="状态"><Tag color={statusColors[data.status]}>{ContractStatusLabels[data.status]}</Tag></Descriptions.Item>
         <Descriptions.Item label="合同名称" span={2}>{data.title}</Descriptions.Item>
         <Descriptions.Item label="客户">{data.customer_name}</Descriptions.Item>
-        <Descriptions.Item label="服务类型">{ServiceTypeLabels[data.service_type]}</Descriptions.Item>
+        <Descriptions.Item label="服务类型">{serviceTypeMap.get(data.service_type) || data.service_type}</Descriptions.Item>
         <Descriptions.Item label="合同金额">{formatAmount(data.total_amount)}</Descriptions.Item>
         <Descriptions.Item label="付款方式">{PaymentPlanLabels[data.payment_plan]}</Descriptions.Item>
         <Descriptions.Item label="已开票金额">{formatAmount(data.invoiced_amount || 0)}</Descriptions.Item>

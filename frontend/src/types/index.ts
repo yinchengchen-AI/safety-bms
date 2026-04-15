@@ -169,7 +169,7 @@ export interface Contract {
   title: string
   customer_id: number
   customer_name?: string
-  service_type: ServiceType
+  service_type: number
   total_amount: number
   payment_plan: PaymentPlan
   status: ContractStatus
@@ -194,7 +194,7 @@ export interface ContractCreate {
   contract_no: string
   title: string
   customer_id: number
-  service_type: ServiceType
+  service_type: number
   total_amount: number
   payment_plan?: PaymentPlan
   start_date?: string
@@ -250,7 +250,7 @@ export interface ServiceOrder {
   order_no: string
   contract_id: number
   title: string
-  service_type: ServiceType
+  service_type: number
   status: ServiceOrderStatus
   assignee_id?: number
   assignee_name?: string
@@ -269,7 +269,7 @@ export interface ServiceOrderCreate {
   order_no: string
   contract_id: number
   title: string
-  service_type: ServiceType
+  service_type: number
   assignee_id?: number
   planned_start?: string
   planned_end?: string
