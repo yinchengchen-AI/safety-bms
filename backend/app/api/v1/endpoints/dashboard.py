@@ -24,6 +24,10 @@ from app.crud.payment import crud_payment
 router = APIRouter(prefix="/dashboard", tags=["仪表盘"])
 
 
+def _invoice_metric_date_expr():
+    return func.coalesce(Invoice.invoice_date, func.date(Invoice.created_at))
+
+
 @router.get("/stats")
 def get_stats(
     current_user: User = Depends(
@@ -34,6 +38,7 @@ def get_stats(
     today = date.today()
     current_year = today.year
     current_month = today.month
+    invoice_metric_date = _invoice_metric_date_expr()
 
     # 合同状态分布
     contract_query = (
@@ -53,8 +58,9 @@ def get_stats(
 
     # 本月开票金额
     invoice_query = db.query(func.coalesce(func.sum(Invoice.amount), 0)).filter(
-        func.extract("year", Invoice.created_at) == current_year,
-        func.extract("month", Invoice.created_at) == current_month,
+        Invoice.status.in_([InvoiceStatus.ISSUED, InvoiceStatus.SENT]),
+        func.extract("year", invoice_metric_date) == current_year,
+        func.extract("month", invoice_metric_date) == current_month,
     )
     invoice_query = apply_data_scope(invoice_query, Invoice, current_user)
     monthly_invoice_amount = invoice_query.scalar()
@@ -83,12 +89,15 @@ def get_stats(
     # 月度开票趋势（带 data_scope 过滤）
     monthly_invoice_query = (
         db.query(
-            extract("month", Invoice.created_at).label("month"),
+            extract("month", invoice_metric_date).label("month"),
             func.sum(Invoice.amount).label("total"),
         )
-        .filter(extract("year", Invoice.created_at) == current_year)
-        .group_by(extract("month", Invoice.created_at))
-        .order_by(extract("month", Invoice.created_at))
+        .filter(
+            Invoice.status.in_([InvoiceStatus.ISSUED, InvoiceStatus.SENT]),
+            extract("year", invoice_metric_date) == current_year,
+        )
+        .group_by(extract("month", invoice_metric_date))
+        .order_by(extract("month", invoice_metric_date))
     )
     monthly_invoice_query = apply_data_scope(
         monthly_invoice_query, Invoice, current_user

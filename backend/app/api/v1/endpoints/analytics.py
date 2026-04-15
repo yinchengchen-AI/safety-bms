@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.core.constants import (
     ContractStatus,
+    InvoiceStatus,
     PermissionCode,
     ServiceOrderStatus,
     ServiceType,
@@ -59,6 +60,10 @@ def _contract_total_amount(contract: Contract) -> float:
     return float(getattr(contract, "total_amount", 0) or 0)
 
 
+def _invoice_metric_date_expr():
+    return func.coalesce(Invoice.invoice_date, func.date(Invoice.created_at))
+
+
 def _period_key(
     year: Decimal | float | int | None, month: Decimal | float | int | None
 ) -> str:
@@ -95,14 +100,16 @@ def _apply_invoice_filters(
     date_to: Optional[date],
     service_type: Optional[ServiceType],
 ):
+    invoice_metric_date = _invoice_metric_date_expr()
+    query = query.filter(Invoice.status.in_([InvoiceStatus.ISSUED, InvoiceStatus.SENT]))
     if service_type:
         query = query.join(Contract, Invoice.contract_id == Contract.id).filter(
             Contract.service_type == service_type
         )
     if date_from:
-        query = query.filter(func.date(Invoice.created_at) >= date_from)
+        query = query.filter(invoice_metric_date >= date_from)
     if date_to:
-        query = query.filter(func.date(Invoice.created_at) <= date_to)
+        query = query.filter(invoice_metric_date <= date_to)
     return apply_data_scope(query, Invoice, current_user)
 
 
@@ -534,6 +541,7 @@ def get_revenue_trend(
     ),
     db: Session = Depends(get_db),
 ):
+    invoice_metric_date = _invoice_metric_date_expr()
     trend_map: dict[str, dict[str, float]] = defaultdict(
         lambda: {
             "signed_amount": 0.0,
@@ -566,8 +574,8 @@ def get_revenue_trend(
         trend_map[key]["signed_amount"] = _to_float(item.total)
 
     invoice_query = db.query(
-        extract("year", Invoice.created_at).label("year"),
-        extract("month", Invoice.created_at).label("month"),
+        extract("year", invoice_metric_date).label("year"),
+        extract("month", invoice_metric_date).label("month"),
         func.coalesce(func.sum(Invoice.amount), 0).label("total"),
     )
     invoice_query = _apply_invoice_filters(
@@ -575,12 +583,12 @@ def get_revenue_trend(
     )
     invoice_results = (
         invoice_query.group_by(
-            extract("year", Invoice.created_at),
-            extract("month", Invoice.created_at),
+            extract("year", invoice_metric_date),
+            extract("month", invoice_metric_date),
         )
         .order_by(
-            extract("year", Invoice.created_at),
-            extract("month", Invoice.created_at),
+            extract("year", invoice_metric_date),
+            extract("month", invoice_metric_date),
         )
         .all()
     )

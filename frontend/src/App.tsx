@@ -37,7 +37,6 @@ const App = () => {
               <Route element={<PrivateRoute />}>
                 <Route element={<AppLayout />}>
                   <Route path="/" element={<Dashboard />} />
-                  <Route path="/analytics/*" element={<Analytics />} />
                   <Route path="/customers/*" element={<Customers />} />
                   <Route path="/contracts/*" element={<Contracts />} />
                   <Route path="/contract-templates/*" element={<ContractTemplates />} />
@@ -46,6 +45,11 @@ const App = () => {
                   <Route path="/payments/*" element={<Payments />} />
                   <Route path="/profile" element={<Profile />} />
                   <Route path="/notifications" element={<Notifications />} />
+                </Route>
+              </Route>
+              <Route element={<PrivateRoute requiredPermissions={['analytics:read']} />}>
+                <Route element={<AppLayout />}>
+                  <Route path="/analytics/*" element={<Analytics />} />
                 </Route>
               </Route>
               <Route element={<PrivateRoute requiredPermissions={['user:read']} />}>

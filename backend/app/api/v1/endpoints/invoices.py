@@ -133,7 +133,9 @@ def create_invoice(
     current_user: User = Depends(require_permissions(PermissionCode.INVOICE_CREATE)),
     db: Session = Depends(get_db),
 ):
-    return invoice_service.create_invoice(db, obj_in=body, applied_by=current_user.id)
+    return invoice_service.create_invoice(
+        db, obj_in=body, applied_by=int(getattr(current_user, "id"))
+    )
 
 
 @router.get("/{invoice_id}", response_model=InvoiceOut)
@@ -167,8 +169,9 @@ def update_invoice(
     if (
         body.status is not None
         and body.status != old_status
-        and updated.applied_by is not None
+        and getattr(updated, "applied_by", None) is not None
     ):
+        applied_by = int(getattr(updated, "applied_by"))
         contract_title = updated.contract.title if updated.contract else ""
         contract_no = updated.contract.contract_no if updated.contract else ""
         customer_name = (
@@ -184,14 +187,15 @@ def update_invoice(
             if updated.tax_amount is not None
             else "0.00"
         )
+        invoice_date_value = getattr(updated, "invoice_date", None)
         invoice_date = (
-            updated.invoice_date.isoformat() if updated.invoice_date else "未填写"
+            invoice_date_value.isoformat() if invoice_date_value else "未填写"
         )
         customer_line = f"客户：{customer_name}\n" if customer_name else ""
         if body.status == InvoiceStatus.ISSUED:
             notification_service.create(
                 db,
-                user_id=updated.applied_by,
+                user_id=applied_by,
                 title="发票已开具",
                 content=(
                     f"发票 {updated.invoice_no} 已开具。\n"
@@ -203,7 +207,7 @@ def update_invoice(
         elif body.status == InvoiceStatus.SENT:
             notification_service.create(
                 db,
-                user_id=updated.applied_by,
+                user_id=applied_by,
                 title="发票已寄出",
                 content=(
                     f"发票 {updated.invoice_no} 已寄出。\n"
@@ -227,35 +231,11 @@ def audit_invoice(
         raise NotFoundError("发票")
     if not check_data_scope(invoice, current_user):
         raise PermissionDeniedError()
-    if invoice.status != InvoiceStatus.APPLYING:
-        raise BusinessError("只有申请中的发票才能审核")
+    updated = invoice_service.audit_invoice(db, invoice_id=invoice_id, body=body)
 
-    update_data: dict = {}
-
-    if body.action == "approve":
-        if not body.invoice_date:
-            raise BusinessError("审核通过时必须填写开票日期")
-        if not body.actual_invoice_no:
-            raise BusinessError("审核通过时必须填写发票号")
-        update_data = {
-            "status": InvoiceStatus.ISSUED,
-            "invoice_date": body.invoice_date,
-            "actual_invoice_no": body.actual_invoice_no,
-            "remark": body.remark,
-        }
-    elif body.action == "reject":
-        if not body.remark:
-            raise BusinessError("驳回时必须填写驳回原因")
-        update_data = {
-            "status": InvoiceStatus.REJECTED,
-            "remark": body.remark,
-        }
-    else:
-        raise BusinessError("无效的审核动作，仅支持 approve 或 reject")
-
-    updated = crud_invoice.update(db, db_obj=invoice, obj_in=update_data)
-
-    if updated.applied_by and updated.applied_by != current_user.id:
+    applied_by = getattr(updated, "applied_by", None)
+    current_user_id = int(getattr(current_user, "id"))
+    if applied_by is not None and int(applied_by) != current_user_id:
         contract_title = updated.contract.title if updated.contract else ""
         contract_no = updated.contract.contract_no if updated.contract else ""
         customer_name = (
@@ -271,7 +251,7 @@ def audit_invoice(
         if body.action == "approve":
             notification_service.create(
                 db,
-                user_id=updated.applied_by,
+                user_id=int(applied_by),
                 title="发票已开具",
                 content=(
                     f"您的开票申请 {updated.invoice_no} 已通过审核，发票已开具。\n"
@@ -285,7 +265,7 @@ def audit_invoice(
         else:
             notification_service.create(
                 db,
-                user_id=updated.applied_by,
+                user_id=int(applied_by),
                 title="开票申请被驳回",
                 content=(
                     f"您的开票申请 {updated.invoice_no} 未通过审核。\n"
@@ -323,9 +303,10 @@ def get_download_url(
     db: Session = Depends(get_db),
 ):
     invoice = crud_invoice.get(db, id=invoice_id)
-    if not invoice or not invoice.file_url:
+    file_url = getattr(invoice, "file_url", None) if invoice else None
+    if not invoice or not file_url:
         raise NotFoundError("发票附件")
     if not check_data_scope(invoice, current_user):
         raise PermissionDeniedError()
-    url = minio_service.get_presigned_url(invoice.file_url)
+    url = minio_service.get_presigned_url(str(file_url))
     return {"url": url}

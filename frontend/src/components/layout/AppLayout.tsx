@@ -188,7 +188,7 @@ const AppLayout: React.FC = () => {
         <Menu
           mode="inline"
           selectedKeys={selectedKeys}
-          defaultOpenKeys={['system']}
+          defaultOpenKeys={['business', 'finance', 'system']}
           items={antMenuItems}
           onClick={({ key }) => navigate(key)}
           style={{ borderRight: 0, height: 'calc(100vh - 64px)', overflow: 'auto' }}

@@ -29,7 +29,7 @@ import {
   useLazyGetAnalyticsDrilldownQuery,
 } from '@/store/api/analyticsApi'
 import { downloadExport } from '@/utils/export'
-import { ContractStatusLabels, CustomerStatusLabels, ServiceTypeLabels, formatAmount } from '@/utils/constants'
+import { ContractStatusLabels, CustomerStatusLabels, InvoiceStatusLabels, ServiceOrderStatusLabels, ServiceTypeLabels, formatAmount } from '@/utils/constants'
 import type { AnalyticsDrilldownItem } from '@/types'
 
 const { RangePicker } = DatePicker
@@ -108,7 +108,18 @@ const Analytics: React.FC = () => {
     { title: '关联信息', dataIndex: 'secondary_label', key: 'secondary_label' },
     { title: '金额', dataIndex: 'amount', key: 'amount', render: (value?: number) => value !== undefined && value !== null ? formatAmount(value) : '-' },
     { title: '日期', dataIndex: 'date_label', key: 'date_label' },
-    { title: '状态/天数', dataIndex: 'status', key: 'status', render: (value?: string) => value ? (ContractStatusLabels[value] || value) : '-' },
+    {
+      title: '状态/天数',
+      dataIndex: 'status',
+      key: 'status',
+      render: (value?: string, record?: AnalyticsDrilldownItem) => {
+        if (!value) return '-'
+        if (record?.category === 'invoice') return InvoiceStatusLabels[value] || value
+        if (record?.category === 'customer') return CustomerStatusLabels[value] || value
+        if (record?.category === 'service') return ServiceOrderStatusLabels[value] || value
+        return ContractStatusLabels[value] || value
+      },
+    },
     { title: '附加信息', dataIndex: 'extra', key: 'extra' },
   ]
 

@@ -23,34 +23,62 @@
 
 ## 快速启动
 
-### 1. 克隆配置文件
+项目现在明确分为两种本地运行模式，请二选一使用：
+
+### 模式 A：完整容器模式（推荐用于联调）
+
+前端、后端、PostgreSQL、Redis、MinIO 全部运行在 Docker 中。
+
+1. 准备根目录 Compose 配置：
 
 ```bash
 cp .env.example .env
 ```
 
-编辑 `.env`，设置各服务密码。
-
-### 2. Docker Compose 启动（生产模式）
+2. 启动完整栈：
 
 ```bash
-docker-compose up -d
+docker compose up -d --build
 ```
 
-### 3. 开发模式（仅启动基础设施）
+3. 初始化默认角色、管理员账号并同步权限定义：
 
 ```bash
-docker-compose -f docker-compose.dev.yml up -d
+docker compose exec backend python app/db/init_db.py
+docker compose exec backend python app/cli/sync_permissions.py
 ```
 
-后端：
+说明：
+
+- 根目录 `.env` 用于 **完整容器模式**，其中数据库、Redis、MinIO 地址应保持为容器服务名（如 `postgres`、`redis`、`minio:9000`）
+- 该模式下只暴露前端入口 `http://localhost`
+- 后端文档通过前端反向代理访问：`http://localhost/api/docs`
+
+### 模式 B：本机开发模式（仅 Docker 基础设施）
+
+Docker 只启动 PostgreSQL / Redis / MinIO，前后端在宿主机本地热重载运行。
+
+1. 准备后端本地配置：
+
+```bash
+cp backend/.env.example backend/.env
+```
+
+2. 启动基础设施：
+
+```bash
+docker compose -f docker-compose.dev.yml up -d
+```
+
+3. 启动本机后端：
+
 ```bash
 cd backend
 pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
 
-初始化默认角色、管理员账号并同步权限定义：
+4. 初始化默认角色、管理员账号并同步权限定义：
 
 ```bash
 cd backend
@@ -58,18 +86,42 @@ PYTHONPATH=. python app/db/init_db.py
 PYTHONPATH=. python app/cli/sync_permissions.py
 ```
 
-前端：
+5. 启动本机前端：
+
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
 
+说明：
+
+- `backend/.env` 用于 **本机开发模式**，其中数据库、Redis、MinIO 地址应保持为 `localhost`
+- Vite 会将 `/api` 代理到 `http://localhost:8000`
+- 该模式下前端入口为 `http://localhost:5173`，后端文档为 `http://localhost:8000/api/docs`
+- `docker-compose.dev.yml` 不会启动 backend/frontend 容器
+
+### 模式边界说明
+
+- 不要再把根目录 `.env` 和 `backend/.env` 混用，它们分别服务于不同模式
+- `docker-compose.yml` 是 **完整容器模式**
+- `docker-compose.dev.yml` 是 **本机开发模式的基础设施**
+- 完整容器模式不再暴露 Postgres / Redis 到宿主机，避免和本机开发模式形成错误耦合
+
 ## 访问地址
+
+### 完整容器模式
 
 | 服务 | 地址 |
 |------|------|
 | 前端 | http://localhost |
+| API 文档 (Swagger) | http://localhost/api/docs |
+
+### 本机开发模式
+
+| 服务 | 地址 |
+|------|------|
+| 前端 | http://localhost:5173 |
 | 后端 API | http://localhost:8000 |
 | API 文档 (Swagger) | http://localhost:8000/api/docs |
 | MinIO 控制台 | http://localhost:9001 |

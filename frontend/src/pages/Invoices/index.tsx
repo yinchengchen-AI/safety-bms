@@ -186,10 +186,11 @@ const Invoices: React.FC = () => {
     { title: '开票日期', dataIndex: 'invoice_date', key: 'invoice_date' },
     { title: '操作', key: 'action', render: (_: any, r: Invoice) => (
       <Space>
+        <PermissionButton permission="invoice:update" type="link" size="small" onClick={() => handleEdit(r)}>编辑</PermissionButton>
         {r.status === 'applying' && (
           <>
-            <Button size="small" type="link" onClick={() => openAuditModal(r, 'approve')}>通过</Button>
-            <Button size="small" type="link" danger onClick={() => openAuditModal(r, 'reject')}>驳回</Button>
+            <PermissionButton permission="invoice:update" size="small" type="link" onClick={() => openAuditModal(r, 'approve')}>通过</PermissionButton>
+            <PermissionButton permission="invoice:update" size="small" type="link" danger onClick={() => openAuditModal(r, 'reject')}>驳回</PermissionButton>
           </>
         )}
         {r.status === 'applying' && (

@@ -1,4 +1,5 @@
 from typing import Any
+from sqlalchemy import false
 from sqlalchemy.orm import Query
 
 from app.models.user import User, DataScope
@@ -10,13 +11,22 @@ _SCOPE_PRIORITY = {
     DataScope.SELF: 1,
 }
 
+_OWNER_FIELDS = (
+    "created_by",
+    "assignee_id",
+    "uploaded_by",
+    "applied_by",
+    "changed_by",
+    "creator_id",
+)
+
 
 def _resolve_data_scope(current_user: User) -> DataScope:
     """根据用户角色的 data_scope 取优先级最高的值。"""
-    if current_user.is_superuser:
+    if bool(getattr(current_user, "is_superuser", False)):
         return DataScope.ALL
     scopes = []
-    for role in current_user.roles:
+    for role in list(getattr(current_user, "roles", []) or []):
         ds = getattr(role, "data_scope", None)
         if ds:
             if isinstance(ds, DataScope):
@@ -36,7 +46,7 @@ def resolve_data_scope(current_user: User) -> DataScope:
 
 def apply_data_scope(query: Query, model_class: Any, current_user: User) -> Query:
     """将数据权限范围应用到查询。"""
-    if current_user.is_superuser:
+    if bool(getattr(current_user, "is_superuser", False)):
         return query
 
     scope = _resolve_data_scope(current_user)
@@ -55,24 +65,27 @@ def apply_data_scope(query: Query, model_class: Any, current_user: User) -> Quer
 
 
 def _apply_self_filters(query: Query, model_class: Any, current_user: User) -> Query:
-    if hasattr(model_class, "created_by"):
-        return query.filter(model_class.created_by == current_user.id)
-    if hasattr(model_class, "assignee_id"):
-        return query.filter(model_class.assignee_id == current_user.id)
-    if hasattr(model_class, "uploaded_by"):
-        return query.filter(model_class.uploaded_by == current_user.id)
-    if hasattr(model_class, "applied_by"):
-        return query.filter(model_class.applied_by == current_user.id)
-    if hasattr(model_class, "changed_by"):
-        return query.filter(model_class.changed_by == current_user.id)
-    if hasattr(model_class, "creator_id"):
-        return query.filter(model_class.creator_id == current_user.id)
-    return query
+    for field in _OWNER_FIELDS:
+        if hasattr(model_class, field):
+            return query.filter(getattr(model_class, field) == current_user.id)
+    if model_class is User:
+        return query.filter(model_class.id == current_user.id)
+    return query.filter(false())
+
+
+def _matches_self_scope(obj: Any, current_user: User) -> bool:
+    if isinstance(obj, User):
+        return getattr(obj, "id", None) == current_user.id
+    for field in _OWNER_FIELDS:
+        value = getattr(obj, field, None)
+        if value is not None:
+            return value == current_user.id
+    return False
 
 
 def check_data_scope(obj: Any, current_user: User) -> bool:
     """检查单条记录是否符合用户的数据权限范围。"""
-    if current_user.is_superuser:
+    if bool(getattr(current_user, "is_superuser", False)):
         return True
 
     scope = _resolve_data_scope(current_user)
@@ -85,29 +98,7 @@ def check_data_scope(obj: Any, current_user: User) -> bool:
         obj_dept_id = getattr(obj, "department_id", None)
         if user_dept_id is not None and obj_dept_id is not None:
             return obj_dept_id == user_dept_id
-        created_by = getattr(obj, "created_by", None)
-        if created_by is not None:
-            return created_by == current_user.id
-        return True
+        return _matches_self_scope(obj, current_user)
 
     # SELF
-    created_by = getattr(obj, "created_by", None)
-    if created_by is not None:
-        return created_by == current_user.id
-    assignee_id = getattr(obj, "assignee_id", None)
-    if assignee_id is not None:
-        return assignee_id == current_user.id
-    uploaded_by = getattr(obj, "uploaded_by", None)
-    if uploaded_by is not None:
-        return uploaded_by == current_user.id
-    applied_by = getattr(obj, "applied_by", None)
-    if applied_by is not None:
-        return applied_by == current_user.id
-    changed_by = getattr(obj, "changed_by", None)
-    if changed_by is not None:
-        return changed_by == current_user.id
-    creator_id = getattr(obj, "creator_id", None)
-    if creator_id is not None:
-        return creator_id == current_user.id
-
-    return True
+    return _matches_self_scope(obj, current_user)
