@@ -2,7 +2,7 @@ from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Nume
 from sqlalchemy.orm import relationship
 
 from app.db.base import Base, TimestampMixin, SoftDeleteMixin
-from app.core.constants import ContractStatus, ServiceType, PaymentPlan
+from app.core.constants import ContractStatus, PaymentPlan
 
 
 class Contract(Base, TimestampMixin, SoftDeleteMixin):
@@ -13,7 +13,8 @@ class Contract(Base, TimestampMixin, SoftDeleteMixin):
     title = Column(String(300), nullable=False, comment="合同名称")
     customer_id = Column(Integer, ForeignKey("customers.id", ondelete="RESTRICT"), nullable=False)
     service_type = Column(
-        SAEnum(ServiceType, name="service_type"),
+        Integer,
+        ForeignKey("service_types.id", ondelete="RESTRICT"),
         nullable=False,
         comment="服务类型",
     )
@@ -41,6 +42,7 @@ class Contract(Base, TimestampMixin, SoftDeleteMixin):
     created_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
     customer = relationship("Customer", back_populates="contracts")
+    service_type_obj = relationship("ServiceType")
     template = relationship("ContractTemplate", back_populates="contracts")
     changes = relationship("ContractChange", back_populates="contract", cascade="all, delete-orphan")
     signatures = relationship("ContractSignature", back_populates="contract", cascade="all, delete-orphan")
@@ -55,7 +57,8 @@ class ContractTemplate(Base, TimestampMixin):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(200), nullable=False, comment="模板名称")
     service_type = Column(
-        SAEnum(ServiceType, name="service_type", create_constraint=False),
+        Integer,
+        ForeignKey("service_types.id", ondelete="RESTRICT"),
         nullable=False,
         comment="适用服务类型",
     )
@@ -63,6 +66,7 @@ class ContractTemplate(Base, TimestampMixin):
     is_default = Column(Boolean, default=False, comment="是否默认模板")
     created_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
+    service_type_obj = relationship("ServiceType")
     contracts = relationship("Contract", back_populates="template")
 
 
