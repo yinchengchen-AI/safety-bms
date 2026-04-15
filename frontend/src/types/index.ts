@@ -180,6 +180,7 @@ export interface Contract {
   remark?: string
   file_url?: string
   template_id?: number
+  standard_doc_url?: string
   draft_doc_url?: string
   final_pdf_url?: string
   signed_at?: string
