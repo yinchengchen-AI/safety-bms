@@ -47,7 +47,7 @@ def render_contract_draft(contract, template_object_name: str) -> str:
             "contract_no": contract.contract_no or "",
             "title": contract.title or "",
             "customer_name": contract.customer.name if contract.customer else "",
-            "service_type_label": _get_service_type_label(contract.service_type.value if contract.service_type else ""),
+            "service_type_label": _get_service_type_label(contract),
             "total_amount": str(contract.total_amount) if contract.total_amount else "0.00",
             "payment_plan_label": _get_payment_plan_label(contract.payment_plan.value if contract.payment_plan else "once"),
             "start_date": contract.start_date.isoformat() if contract.start_date else "",
@@ -215,15 +215,10 @@ def save_base64_signature_to_minio(base64_data: str, prefix: str, max_size_mb: f
     return object_name
 
 
-def _get_service_type_label(value: str) -> str:
-    labels = {
-        "evaluation": "安全评价",
-        "training": "安全培训",
-        "inspection": "安全检测检验",
-        "consulting": "安全咨询顾问",
-        "emergency_plan": "应急预案编制",
-    }
-    return labels.get(value, value)
+def _get_service_type_label(contract) -> str:
+    if contract.service_type_obj:
+        return contract.service_type_obj.name
+    return ""
 
 
 def _get_payment_plan_label(value: str) -> str:
