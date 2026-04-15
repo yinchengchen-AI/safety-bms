@@ -52,6 +52,44 @@ def create_customer() -> int:
     return r.json()["id"]
 
 
+SERVICE_TYPE_ID = None
+
+
+def _db_conn():
+    import psycopg2, os
+    return psycopg2.connect(
+        host=os.getenv("DB_HOST", "localhost"),
+        port=os.getenv("DB_PORT", "5432"),
+        dbname=os.getenv("DB_NAME", "safety_bms"),
+        user=os.getenv("DB_USER", "postgres"),
+        password=os.getenv("DB_PASSWORD", "postgres"),
+    )
+
+
+def get_service_type_id() -> int:
+    global SERVICE_TYPE_ID
+    if SERVICE_TYPE_ID is None:
+        conn = _db_conn()
+        cur = conn.cursor()
+        cur.execute("SELECT id FROM service_types WHERE is_active = TRUE LIMIT 1")
+        row = cur.fetchone()
+        if row:
+            SERVICE_TYPE_ID = row[0]
+        else:
+            cur.execute(
+                "INSERT INTO service_types (code, name, is_active, created_at, updated_at) VALUES (%s, %s, TRUE, NOW(), NOW()) RETURNING id",
+                ("evaluation", "安全评价"),
+            )
+            row = cur.fetchone()
+            assert row is not None
+            SERVICE_TYPE_ID = row[0]
+            conn.commit()
+        cur.close()
+        conn.close()
+    assert SERVICE_TYPE_ID is not None
+    return SERVICE_TYPE_ID
+
+
 def ensure_test_template() -> int:
     """确保存在一个可用的合同模板，没有则自动创建并上传一个最小 docx 文件。"""
     r = session.get(f"{BASE_URL}/contract-templates?page=1&page_size=1")
@@ -66,21 +104,16 @@ def ensure_test_template() -> int:
     doc_path = "/tmp/test_contract_template.docx"
     doc.save(doc_path)
 
-    # 由于 create_contract_template API 要求 file_url NOT NULL，我们先用 SQL 插入记录
-    import psycopg2, os
-    conn = psycopg2.connect(
-        host=os.getenv("DB_HOST", "localhost"),
-        port=os.getenv("DB_PORT", "5432"),
-        dbname=os.getenv("DB_NAME", "safety_bms"),
-        user=os.getenv("DB_USER", "postgres"),
-        password=os.getenv("DB_PASSWORD", "postgres"),
-    )
+    service_type_id = get_service_type_id()
+    conn = _db_conn()
     cur = conn.cursor()
     cur.execute(
         "INSERT INTO contract_templates (name, service_type, file_url, is_default, created_by, created_at, updated_at) VALUES (%s, %s, %s, %s, %s, NOW(), NOW()) RETURNING id",
-        ("测试模板", "EVALUATION", "contract-templates/test.docx", False, 1),
+        ("测试模板", service_type_id, "contract-templates/test.docx", False, 1),
     )
-    template_id = cur.fetchone()[0]
+    row = cur.fetchone()
+    assert row is not None
+    template_id = row[0]
     conn.commit()
     cur.close()
     conn.close()
@@ -100,7 +133,7 @@ def create_contract(customer_id: int, total_amount: float = 10000, template_id: 
         "contract_no": f"C-{date.today().isoformat()}-{total_amount}-{str(uuid.uuid4())[:4]}",
         "title": "测试合同",
         "customer_id": customer_id,
-        "service_type": "evaluation",
+        "service_type": get_service_type_id(),
         "total_amount": total_amount,
         "sign_date": date.today().isoformat(),
         "start_date": date.today().isoformat(),

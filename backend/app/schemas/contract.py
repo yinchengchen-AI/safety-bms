@@ -132,7 +132,7 @@ class ContractOut(ContractBase):
     # 统计字段（由service层计算）
     invoiced_amount: Optional[Decimal] = None
     received_amount: Optional[Decimal] = None
-    service_type_id: int
+    service_type_id: Optional[int] = None
     service_type_name: Optional[str] = None
     service_type_code: Optional[str] = None
 
@@ -146,7 +146,7 @@ class ContractListOut(BaseModel):
     customer_id: int
     customer_name: Optional[str] = None
     service_type: int
-    service_type_id: int
+    service_type_id: Optional[int] = None
     service_type_name: Optional[str] = None
     service_type_code: Optional[str] = None
     total_amount: Decimal
