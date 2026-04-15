@@ -12,8 +12,8 @@ from app.core.constants import (
     InvoiceStatus,
     PermissionCode,
     ServiceOrderStatus,
-    ServiceType,
 )
+from app.models.service_type import ServiceType as ServiceTypeModel
 from app.db.session import get_db
 from app.dependencies import require_permissions
 from app.models.contract import Contract
@@ -75,7 +75,7 @@ def _apply_contract_filters(
     current_user: User,
     date_from: Optional[date],
     date_to: Optional[date],
-    service_type: Optional[ServiceType],
+    service_type: Optional[int],
 ):
     query = query.filter(
         Contract.is_deleted == False,
@@ -98,7 +98,7 @@ def _apply_invoice_filters(
     current_user: User,
     date_from: Optional[date],
     date_to: Optional[date],
-    service_type: Optional[ServiceType],
+    service_type: Optional[int],
 ):
     invoice_metric_date = _invoice_metric_date_expr()
     query = query.filter(Invoice.status.in_([InvoiceStatus.ISSUED, InvoiceStatus.SENT]))
@@ -118,7 +118,7 @@ def _apply_payment_filters(
     current_user: User,
     date_from: Optional[date],
     date_to: Optional[date],
-    service_type: Optional[ServiceType],
+    service_type: Optional[int],
 ):
     if service_type:
         query = query.join(Contract, Payment.contract_id == Contract.id).filter(
@@ -136,7 +136,7 @@ def _contract_ids_for_filters(
     current_user: User,
     date_from: Optional[date],
     date_to: Optional[date],
-    service_type: Optional[ServiceType],
+    service_type: Optional[int],
 ) -> list[int]:
     query = db.query(Contract.id)
     query = _apply_contract_filters(
@@ -168,7 +168,7 @@ def _build_drilldown_rows(
     group_value: Optional[str],
     date_from: Optional[date],
     date_to: Optional[date],
-    service_type: Optional[ServiceType],
+    service_type: Optional[int],
 ) -> list[AnalyticsDrilldownItemOut]:
     if period:
         date_from, date_to = _month_range(period)
@@ -459,7 +459,7 @@ def _build_drilldown_rows(
 def get_analytics_overview(
     date_from: Optional[date] = None,
     date_to: Optional[date] = None,
-    service_type: Optional[ServiceType] = None,
+    service_type: Optional[int] = None,
     current_user: User = Depends(
         require_permissions(PermissionCode.ANALYTICS_READ.value)
     ),
@@ -535,7 +535,7 @@ def get_analytics_overview(
 def get_revenue_trend(
     date_from: Optional[date] = None,
     date_to: Optional[date] = None,
-    service_type: Optional[ServiceType] = None,
+    service_type: Optional[int] = None,
     current_user: User = Depends(
         require_permissions(PermissionCode.ANALYTICS_READ.value)
     ),
@@ -638,7 +638,7 @@ def get_revenue_trend(
 def get_performance_ranking(
     date_from: Optional[date] = None,
     date_to: Optional[date] = None,
-    service_type: Optional[ServiceType] = None,
+    service_type: Optional[int] = None,
     limit: int = Query(10, ge=1, le=50),
     current_user: User = Depends(
         require_permissions(PermissionCode.ANALYTICS_READ.value)
@@ -737,7 +737,7 @@ def get_performance_ranking(
 def get_receivable_aging(
     date_from: Optional[date] = None,
     date_to: Optional[date] = None,
-    service_type: Optional[ServiceType] = None,
+    service_type: Optional[int] = None,
     current_user: User = Depends(
         require_permissions(PermissionCode.ANALYTICS_READ.value)
     ),
@@ -901,7 +901,7 @@ def get_customer_insights(
 def get_service_efficiency(
     date_from: Optional[date] = None,
     date_to: Optional[date] = None,
-    service_type: Optional[ServiceType] = None,
+    service_type: Optional[int] = None,
     current_user: User = Depends(
         require_permissions(PermissionCode.ANALYTICS_READ.value)
     ),
@@ -974,9 +974,9 @@ def get_service_efficiency(
     )
 
     dist_query = db.query(
-        ServiceOrder.service_type.label("service_type"),
+        ServiceTypeModel.code.label("service_type"),
         func.count(ServiceOrder.id).label("order_count"),
-    )
+    ).join(ServiceOrder, ServiceOrder.service_type == ServiceTypeModel.id)
     if date_from:
         dist_query = dist_query.filter(func.date(ServiceOrder.created_at) >= date_from)
     if date_to:
@@ -984,7 +984,7 @@ def get_service_efficiency(
     if service_type:
         dist_query = dist_query.filter(ServiceOrder.service_type == service_type)
     dist_query = apply_data_scope(dist_query, ServiceOrder, current_user)
-    dist_results = dist_query.group_by(ServiceOrder.service_type).all()
+    dist_results = dist_query.group_by(ServiceTypeModel.code).all()
 
     trend_items: list[ServiceEfficiencyTrendItemOut] = []
     for item in trend_results:
@@ -1009,7 +1009,7 @@ def get_service_efficiency(
         trend=trend_items,
         service_type_distribution=[
             ServiceTypeDistributionItemOut(
-                service_type=enum_value(item.service_type),
+                service_type=item.service_type or "",
                 order_count=int(item.order_count or 0),
             )
             for item in dist_results
@@ -1025,7 +1025,7 @@ def get_analytics_drilldown(
     group_value: Optional[str] = None,
     date_from: Optional[date] = None,
     date_to: Optional[date] = None,
-    service_type: Optional[ServiceType] = None,
+    service_type: Optional[int] = None,
     current_user: User = Depends(
         require_permissions(PermissionCode.ANALYTICS_READ.value)
     ),
@@ -1053,7 +1053,7 @@ def export_analytics_drilldown(
     group_value: Optional[str] = None,
     date_from: Optional[date] = None,
     date_to: Optional[date] = None,
-    service_type: Optional[ServiceType] = None,
+    service_type: Optional[int] = None,
     current_user: User = Depends(
         require_permissions(PermissionCode.ANALYTICS_READ.value)
     ),
