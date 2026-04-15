@@ -14,6 +14,7 @@ import Analytics from '@/pages/Analytics'
 import Customers from '@/pages/Customers'
 import Contracts from '@/pages/Contracts'
 import ContractTemplates from '@/pages/ContractTemplates'
+import ServiceTypes from '@/pages/ServiceTypes'
 import Services from '@/pages/Services'
 import Invoices from '@/pages/Invoices'
 import Payments from '@/pages/Payments'
@@ -40,6 +41,7 @@ const App = () => {
                   <Route path="/customers/*" element={<Customers />} />
                   <Route path="/contracts/*" element={<Contracts />} />
                   <Route path="/contract-templates/*" element={<ContractTemplates />} />
+                  <Route path="/service-types/*" element={<ServiceTypes />} />
                   <Route path="/services/*" element={<Services />} />
                   <Route path="/invoices/*" element={<Invoices />} />
                   <Route path="/payments/*" element={<Payments />} />

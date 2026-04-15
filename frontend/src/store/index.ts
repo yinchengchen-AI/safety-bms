@@ -16,6 +16,7 @@ import './api/rolesApi'
 import './api/permissionsApi'
 import './api/departmentsApi'
 import './api/notificationsApi'
+import './api/serviceTypesApi'
 
 export const store = configureStore({
   reducer: {

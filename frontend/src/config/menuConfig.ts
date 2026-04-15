@@ -33,6 +33,7 @@ export const menuConfig: MenuItem[] = [
     children: [
       { key: '/contracts', icon: FileTextOutlined, label: '合同管理', path: '/contracts', requiredPermissions: ['contract:read'] },
       { key: '/contract-templates', icon: FileTextOutlined, label: '合同模板', path: '/contract-templates', requiredPermissions: ['contract:read'] },
+      { key: '/service-types', icon: ToolOutlined, label: '服务类型', path: '/service-types', requiredPermissions: ['service:read'] },
       { key: '/services', icon: ToolOutlined, label: '服务管理', path: '/services', requiredPermissions: ['service:read'] },
     ],
   },
