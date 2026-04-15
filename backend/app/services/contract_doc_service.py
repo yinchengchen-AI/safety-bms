@@ -46,10 +46,11 @@ def render_contract_draft(contract, template_object_name: str) -> str:
 
         doc = DocxTemplate(str(template_path))
 
+        customer = contract.customer
         context = {
             "contract_no": contract.contract_no or "",
             "title": contract.title or "",
-            "customer_name": contract.customer.name if contract.customer else "",
+            "customer_name": customer.name if customer else "",
             "service_type_label": _get_service_type_label(contract),
             "total_amount": str(contract.total_amount) if contract.total_amount else "0.00",
             "payment_plan_label": _get_payment_plan_label(contract.payment_plan.value if contract.payment_plan else "once"),
@@ -58,6 +59,24 @@ def render_contract_draft(contract, template_object_name: str) -> str:
             "sign_date": contract.sign_date.isoformat() if contract.sign_date else "",
             "remark": contract.remark or "",
             "created_at": contract.created_at.isoformat() if contract.created_at else "",
+            "party_a_name": customer.name if customer else "",
+            "party_a_legal_rep": "",
+            "party_a_contact_name": customer.contact_name if customer else "",
+            "party_a_address": customer.address if customer else "",
+            "party_a_phone": customer.contact_phone if customer else "",
+            "party_a_fax": "",
+            "party_a_bank": "",
+            "party_a_account": "",
+            "party_a_tax_no": customer.credit_code if customer else "",
+            "party_b_name": "杭州承益安全科技有限公司",
+            "party_b_legal_rep": "沈琳莉",
+            "party_b_project_manager": "",
+            "party_b_address": "杭州市余杭区瓶窑镇国辅路9号内2幢201-202室",
+            "party_b_phone": "",
+            "party_b_mobile": "15888839287",
+            "party_b_bank": "浙江杭州余杭农村商业银行股份有限公司余杭支行",
+            "party_b_account": "201000261749218",
+            "party_b_bank_code": "402331003097",
         }
 
         doc.render(context)
@@ -321,6 +340,23 @@ def _build_standard_contract_context(contract) -> dict:
     return {
         "contract_reg_no": contract.contract_no or "",
         "party_a_name": customer.name if customer else "",
+        "party_a_legal_rep": "",
+        "party_a_contact_name": customer.contact_name if customer else "",
+        "party_a_address": customer.address if customer else "",
+        "party_a_phone": customer.contact_phone if customer else "",
+        "party_a_fax": "",
+        "party_a_bank": "",
+        "party_a_account": "",
+        "party_a_tax_no": customer.credit_code if customer else "",
+        "party_b_name": "杭州承益安全科技有限公司",
+        "party_b_legal_rep": "沈琳莉",
+        "party_b_project_manager": "",
+        "party_b_address": "杭州市余杭区瓶窑镇国辅路9号内2幢201-202室",
+        "party_b_phone": "",
+        "party_b_mobile": "15888839287",
+        "party_b_bank": "浙江杭州余杭农村商业银行股份有限公司余杭支行",
+        "party_b_account": "201000261749218",
+        "party_b_bank_code": "402331003097",
         "sign_location": sign_location,
         "sign_year": sign_date.year if sign_date else "",
         "sign_month": sign_date.month if sign_date else "",
