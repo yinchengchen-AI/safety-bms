@@ -7,6 +7,9 @@ from docxtpl import DocxTemplate
 from docx import Document
 from docx.shared import Inches
 
+import logging
+
+from app.models.contract import ContractTemplate
 from app.services.minio_service import minio_service
 
 
@@ -227,3 +230,151 @@ def _get_payment_plan_label(value: str) -> str:
         "installment": "分期",
     }
     return labels.get(value, value)
+
+
+def number_to_chinese_upper(amount) -> str:
+    from decimal import Decimal, ROUND_HALF_UP
+
+    amount = Decimal(str(amount)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    integer_part = int(amount)
+    decimal_part = int((amount - integer_part) * 100)
+
+    nums = "零壹贰叁肆伍陆柒捌玖"
+    units = ["", "拾", "佰", "仟"]
+
+    def _four_digit_to_chinese(n: int) -> str:
+        if n == 0:
+            return "零"
+        s = str(n)
+        result = []
+        for i, ch in enumerate(s):
+            digit = int(ch)
+            pos = len(s) - i - 1
+            if digit == 0:
+                if result and result[-1] != "零":
+                    result.append("零")
+            else:
+                result.append(nums[digit] + units[pos % 4])
+        return "".join(result).rstrip("零")
+
+    def _int_to_chinese(n: int) -> str:
+        if n == 0:
+            return "零"
+        if n < 10000:
+            return _four_digit_to_chinese(n)
+
+        low = n % 10000
+        mid = (n // 10000) % 10000
+        high = n // 100000000
+
+        parts = []
+        if high > 0:
+            parts.append(_four_digit_to_chinese(high) + "亿")
+        if mid > 0:
+            parts.append(_four_digit_to_chinese(mid) + "万")
+        elif high > 0 and low > 0:
+            parts.append("零")
+
+        if low > 0:
+            low_str = _four_digit_to_chinese(low)
+            if mid > 0 and len(str(low)) < 4 and not low_str.startswith("零"):
+                low_str = "零" + low_str
+            parts.append(low_str)
+
+        return "".join(parts).rstrip("零")
+
+    jiao = decimal_part // 10
+    fen = decimal_part % 10
+
+    if integer_part == 0:
+        if jiao == 0 and fen == 0:
+            return "零元整"
+        result = ""
+    else:
+        result = _int_to_chinese(integer_part) + "元"
+
+    if jiao == 0 and fen == 0:
+        result += "整"
+    else:
+        if jiao > 0:
+            result += nums[jiao] + "角"
+        if fen > 0:
+            if integer_part > 0 and jiao == 0:
+                result += "零"
+            result += nums[fen] + "分"
+
+    return result
+
+
+def _build_standard_contract_context(contract) -> dict:
+    customer = contract.customer
+    sign_date = contract.sign_date
+    start_date = contract.start_date
+    end_date = contract.end_date
+
+    sign_location = ""
+    if customer:
+        sign_location = f"{customer.city or ''}{customer.district or ''}"
+
+    total_amount = contract.total_amount or 0
+
+    return {
+        "contract_reg_no": contract.contract_no or "",
+        "party_a_name": customer.name if customer else "",
+        "sign_location": sign_location,
+        "sign_year": sign_date.year if sign_date else "",
+        "sign_month": sign_date.month if sign_date else "",
+        "sign_day": sign_date.day if sign_date else "",
+        "valid_start_year": start_date.year if start_date else "",
+        "valid_start_month": start_date.month if start_date else "",
+        "valid_start_day": start_date.day if start_date else "",
+        "valid_end_year": end_date.year if end_date else "",
+        "valid_end_month": end_date.month if end_date else "",
+        "valid_end_day": end_date.day if end_date else "",
+        "service_start_year": start_date.year if start_date else "",
+        "service_start_month": start_date.month if start_date else "",
+        "service_start_day": start_date.day if start_date else "",
+        "service_end_year": end_date.year if end_date else "",
+        "service_end_month": end_date.month if end_date else "",
+        "service_end_day": end_date.day if end_date else "",
+        "total_amount": str(total_amount),
+        "total_amount_upper": number_to_chinese_upper(total_amount),
+        "payment_amount": str(total_amount),
+        "service_address": customer.address if customer else "",
+    }
+
+
+def render_standard_contract_draft(contract, db) -> str | None:
+    logger = logging.getLogger(__name__)
+
+    template = db.query(ContractTemplate).filter(ContractTemplate.is_default == True).first()
+    if not template or not template.file_url:
+        logger.warning("未找到默认合同模板，跳过标准合同草稿生成")
+        return None
+
+    try:
+        template_bytes = _download_minio_file(template.file_url)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            template_path = Path(tmpdir) / "template.docx"
+            template_path.write_bytes(template_bytes)
+
+            doc = DocxTemplate(str(template_path))
+            context = _build_standard_contract_context(contract)
+            doc.render(context)
+
+            output_path = Path(tmpdir) / "standard_draft.docx"
+            doc.save(str(output_path))
+
+            draft_bytes = output_path.read_bytes()
+
+        draft_object_name = f"contracts/{contract.id}/standard_drafts/{uuid.uuid4().hex}.docx"
+        _upload_bytes_to_minio(
+            draft_bytes,
+            draft_object_name,
+            content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        )
+        return draft_object_name
+    except Exception:
+        logger.exception("标准合同草稿生成失败")
+        return None

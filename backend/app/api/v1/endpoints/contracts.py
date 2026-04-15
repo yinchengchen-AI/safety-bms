@@ -16,7 +16,8 @@ from app.core.constants import ContractStatus, PermissionCode
 from app.models.contract import Contract, ContractTemplate, ContractSignature, ContractChange
 from app.models.user import User
 from app.services.minio_service import minio_service
-from app.services.contract_doc_service import render_contract_draft, insert_signatures_and_to_pdf, save_base64_signature_to_minio
+import logging
+from app.services.contract_doc_service import render_contract_draft, render_standard_contract_draft, insert_signatures_and_to_pdf, save_base64_signature_to_minio
 from app.services.notification_service import notification_service
 from app.utils.data_scope import apply_data_scope, check_data_scope
 from app.utils.pagination import make_page_response
@@ -31,6 +32,11 @@ def _enrich_contract_out(contract, out: ContractOut) -> ContractOut:
         out.service_type_id = contract.service_type_obj.id
         out.service_type_name = contract.service_type_obj.name
         out.service_type_code = contract.service_type_obj.code
+    if contract.standard_doc_url:
+        try:
+            out.standard_doc_url = minio_service.get_presigned_url(contract.standard_doc_url)
+        except Exception:
+            out.standard_doc_url = None
     return out
 
 
@@ -175,13 +181,19 @@ def update_contract_status(
     old_status = contract.status
     # 提交审核时自动生草稿并校验模板
     if body.status == ContractStatus.REVIEW and old_status == ContractStatus.DRAFT:
-        if not contract.template_id:
-            raise BusinessError("该合同未选择模板，无法提交审核")
-        template = db.query(ContractTemplate).filter(ContractTemplate.id == contract.template_id).first()
-        if not template or not template.file_url:
-            raise BusinessError("模板文件不存在")
-        draft_object_name = render_contract_draft(contract, template.file_url)
-        contract.draft_doc_url = draft_object_name
+        if contract.template_id:
+            template = db.query(ContractTemplate).filter(ContractTemplate.id == contract.template_id).first()
+            if not template or not template.file_url:
+                raise BusinessError("模板文件不存在")
+            draft_object_name = render_contract_draft(contract, template.file_url)
+            contract.draft_doc_url = draft_object_name
+        else:
+            try:
+                standard_object_name = render_standard_contract_draft(contract, db)
+                if standard_object_name:
+                    contract.standard_doc_url = standard_object_name
+            except Exception:
+                logging.getLogger(__name__).exception("标准合同草稿生成失败，不影响审核提交")
     updated = crud_contract.update_status(
         db, db_obj=contract, new_status=body.status, changed_by=current_user.id, remark=body.remark or ""
     )

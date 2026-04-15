@@ -38,6 +38,7 @@ class Contract(Base, TimestampMixin, SoftDeleteMixin):
     template_id = Column(Integer, ForeignKey("contract_templates.id", ondelete="SET NULL"), nullable=True, comment="关联模板ID")
     draft_doc_url = Column(String(500), comment="待签文档 MinIO 路径")
     final_pdf_url = Column(String(500), comment="最终PDF MinIO 路径")
+    standard_doc_url = Column(String(500), comment="标准合同草稿 MinIO 路径")
     signed_at = Column(DateTime(timezone=True), comment="签订时间")
     created_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
@@ -66,7 +67,7 @@ class ContractTemplate(Base, TimestampMixin):
     is_default = Column(Boolean, default=False, comment="是否默认模板")
     created_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
-    service_type_obj = relationship("ServiceType")
+    service_type_obj = relationship("ServiceType", foreign_keys=[service_type])
     contracts = relationship("Contract", back_populates="template")
 
 

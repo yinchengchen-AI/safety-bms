@@ -208,7 +208,11 @@ const Contracts: React.FC = () => {
           </Popconfirm>
         )}
         {r.status === 'draft' && (
-          <PermissionButton permission="contract:update" size="small" onClick={() => updateStatus({ id: r.id, status: 'review' })}>提交审核</PermissionButton>
+          <PermissionButton permission="contract:update" size="small" onClick={() => {
+            updateStatus({ id: r.id, status: 'review' }).unwrap()
+              .then(() => message.success('已提交审核，标准合同草稿已生成'))
+              .catch((err: any) => message.error(err?.data?.detail || '提交审核失败'))
+          }}>提交审核</PermissionButton>
         )}
         {r.status === 'review' && (
           <>
@@ -431,6 +435,15 @@ const ContractDetail: React.FC<{
           <Descriptions.Item label="签订时间" span={2}>{data.signed_at}</Descriptions.Item>
         )}
         <Descriptions.Item label="备注" span={2}>{data.remark}</Descriptions.Item>
+        {data.standard_doc_url ? (
+          <Descriptions.Item label="标准合同草稿" span={2}>
+            <Button type="link" onClick={() => window.open(data.standard_doc_url, '_blank')}>下载标准合同草稿</Button>
+          </Descriptions.Item>
+        ) : (
+          <Descriptions.Item label="标准合同草稿" span={2}>
+            <span style={{ color: '#999' }}>尚未生成标准合同草稿（提交审核后自动生成）</span>
+          </Descriptions.Item>
+        )}
       </Descriptions>
     </Drawer>
   )

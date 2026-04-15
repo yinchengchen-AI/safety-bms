@@ -69,10 +69,10 @@ class ContractTemplateOut(BaseModel):
     id: int
     name: str
     service_type: int
-    service_type_id: int
+    service_type_id: Optional[int] = None
     service_type_name: Optional[str] = None
     service_type_code: Optional[str] = None
-    file_url: str
+    file_url: Optional[str] = None
     is_default: bool
     created_at: datetime
 
@@ -122,6 +122,7 @@ class ContractOut(ContractBase):
     status: ContractStatus
     file_url: Optional[str] = None
     template_id: Optional[int] = None
+    standard_doc_url: Optional[str] = None
     draft_doc_url: Optional[str] = None
     final_pdf_url: Optional[str] = None
     signed_at: Optional[datetime] = None
@@ -131,7 +132,7 @@ class ContractOut(ContractBase):
     # 统计字段（由service层计算）
     invoiced_amount: Optional[Decimal] = None
     received_amount: Optional[Decimal] = None
-    service_type_id: int
+    service_type_id: Optional[int] = None
     service_type_name: Optional[str] = None
     service_type_code: Optional[str] = None
 
@@ -145,7 +146,7 @@ class ContractListOut(BaseModel):
     customer_id: int
     customer_name: Optional[str] = None
     service_type: int
-    service_type_id: int
+    service_type_id: Optional[int] = None
     service_type_name: Optional[str] = None
     service_type_code: Optional[str] = None
     total_amount: Decimal
@@ -155,6 +156,7 @@ class ContractListOut(BaseModel):
     start_date: Optional[date] = None
     end_date: Optional[date] = None
     template_id: Optional[int] = None
+    standard_doc_url: Optional[str] = None
     draft_doc_url: Optional[str] = None
     final_pdf_url: Optional[str] = None
     created_at: datetime
