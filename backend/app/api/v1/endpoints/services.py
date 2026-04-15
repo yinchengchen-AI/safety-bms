@@ -31,6 +31,34 @@ from app.utils.excel_export import export_excel_response
 router = APIRouter(prefix="/services", tags=["服务管理"])
 
 
+def _enrich_service_order_out(order, out: ServiceOrderOut) -> ServiceOrderOut:
+    out.customer_name = (
+        order.contract.customer.name
+        if order.contract and order.contract.customer
+        else None
+    )
+    out.assignee_name = order.assignee.full_name if order.assignee else None
+    if order.service_type_obj:
+        out.service_type_id = order.service_type_obj.id
+        out.service_type_name = order.service_type_obj.name
+        out.service_type_code = order.service_type_obj.code
+    return out
+
+
+def _enrich_service_order_list_out(order, out: ServiceOrderListOut) -> ServiceOrderListOut:
+    out.customer_name = (
+        order.contract.customer.name
+        if order.contract and order.contract.customer
+        else None
+    )
+    out.assignee_name = order.assignee.full_name if order.assignee else None
+    if order.service_type_obj:
+        out.service_type_id = order.service_type_obj.id
+        out.service_type_name = order.service_type_obj.name
+        out.service_type_code = order.service_type_obj.code
+    return out
+
+
 def _get_service_order_with_relations(
     db: Session, order_id: int
 ) -> Optional[ServiceOrder]:
@@ -78,12 +106,7 @@ def list_service_orders(
     result = []
     for item in items:
         out = ServiceOrderListOut.model_validate(item)
-        out.customer_name = (
-            item.contract.customer.name
-            if item.contract and item.contract.customer
-            else None
-        )
-        out.assignee_name = item.assignee.full_name if item.assignee else None
+        _enrich_service_order_list_out(item, out)
         result.append(out)
     return make_page_response(total, result, page, page_size)
 
@@ -132,7 +155,7 @@ def export_service_orders(
                 item.contract.customer.name
                 if item.contract and item.contract.customer
                 else "",
-                item.service_type.value if item.service_type else "",
+                item.service_type_obj.name if item.service_type_obj else "",
                 item.assignee.full_name if item.assignee else "",
                 item.status.value if item.status else "",
                 item.planned_start.strftime("%Y-%m-%d") if item.planned_start else "",
@@ -178,12 +201,7 @@ def get_service_order(
     if not check_data_scope(order, current_user):
         raise BusinessError("无权查看该记录", status_code=403)
     result = ServiceOrderOut.model_validate(order)
-    result.customer_name = (
-        order.contract.customer.name
-        if order.contract and order.contract.customer
-        else None
-    )
-    result.assignee_name = order.assignee.full_name if order.assignee else None
+    _enrich_service_order_out(order, result)
     return result
 
 

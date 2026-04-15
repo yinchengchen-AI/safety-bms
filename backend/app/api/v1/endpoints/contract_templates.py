@@ -8,7 +8,7 @@ from app.schemas.common import PageResponse, ResponseMsg, FileUploadResponse
 from app.crud.contract import crud_contract_template
 from app.dependencies import require_permissions
 from app.core.exceptions import NotFoundError
-from app.core.constants import PermissionCode, ServiceType
+from app.core.constants import PermissionCode
 from app.models.contract import ContractTemplate
 from app.models.user import User
 from app.services.minio_service import minio_service
@@ -21,7 +21,7 @@ router = APIRouter(prefix="/contract-templates", tags=["合同模板"])
 def list_contract_templates(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=200),
-    service_type: Optional[ServiceType] = None,
+    service_type: Optional[int] = None,
     current_user: User = Depends(require_permissions(PermissionCode.CONTRACT_UPDATE)),
     db: Session = Depends(get_db),
 ):
@@ -36,7 +36,15 @@ def list_contract_templates(
         .limit(page_size)
         .all()
     )
-    return make_page_response(total, items, page, page_size)
+    items_out = []
+    for t in items:
+        out = ContractTemplateOut.model_validate(t)
+        if t.service_type_obj:
+            out.service_type_id = t.service_type_obj.id
+            out.service_type_name = t.service_type_obj.name
+            out.service_type_code = t.service_type_obj.code
+        items_out.append(out)
+    return make_page_response(total, items_out, page, page_size)
 
 
 @router.post("", response_model=ContractTemplateOut, status_code=201)
