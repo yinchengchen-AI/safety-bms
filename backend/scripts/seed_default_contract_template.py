@@ -21,11 +21,6 @@ MINIO_OBJECT_NAME = "contract-templates/default-安全生产社会化服务_temp
 
 
 def seed(db: Session) -> None:
-    existing = db.query(ContractTemplate).filter(ContractTemplate.is_default == True).first()
-    if existing:
-        print(f"默认模板已存在: {existing.name} (id={existing.id})")
-        return
-
     if not TEMPLATE_PATH.exists():
         print(f"模板文件不存在: {TEMPLATE_PATH}")
         sys.exit(1)
@@ -43,6 +38,16 @@ def seed(db: Session) -> None:
         length=len(file_bytes),
         content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     )
+
+    existing = db.query(ContractTemplate).filter(ContractTemplate.is_default == True).first()
+    if existing:
+        existing.name = "安全生产社会化服务标准模板"
+        existing.file_url = MINIO_OBJECT_NAME
+        existing.service_type = service_type.id
+        db.commit()
+        db.refresh(existing)
+        print(f"✅ 默认模板已更新: {existing.name} (id={existing.id}, service_type={service_type.name})")
+        return
 
     template = ContractTemplate(
         name="安全生产社会化服务标准模板",
