@@ -227,3 +227,77 @@ def _get_payment_plan_label(value: str) -> str:
         "installment": "分期",
     }
     return labels.get(value, value)
+
+
+def number_to_chinese_upper(amount) -> str:
+    from decimal import Decimal, ROUND_HALF_UP
+
+    amount = Decimal(str(amount)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    integer_part = int(amount)
+    decimal_part = int((amount - integer_part) * 100)
+
+    nums = "零壹贰叁肆伍陆柒捌玖"
+    units = ["", "拾", "佰", "仟"]
+
+    def _four_digit_to_chinese(n: int) -> str:
+        if n == 0:
+            return "零"
+        s = str(n)
+        result = []
+        for i, ch in enumerate(s):
+            digit = int(ch)
+            pos = len(s) - i - 1
+            if digit == 0:
+                if result and result[-1] != "零":
+                    result.append("零")
+            else:
+                result.append(nums[digit] + units[pos % 4])
+        return "".join(result).rstrip("零")
+
+    def _int_to_chinese(n: int) -> str:
+        if n == 0:
+            return "零"
+        if n < 10000:
+            return _four_digit_to_chinese(n)
+
+        low = n % 10000
+        mid = (n // 10000) % 10000
+        high = n // 100000000
+
+        parts = []
+        if high > 0:
+            parts.append(_four_digit_to_chinese(high) + "亿")
+        if mid > 0:
+            parts.append(_four_digit_to_chinese(mid) + "万")
+        elif high > 0 and low > 0:
+            parts.append("零")
+
+        if low > 0:
+            low_str = _four_digit_to_chinese(low)
+            if mid > 0 and len(str(low)) < 4 and not low_str.startswith("零"):
+                low_str = "零" + low_str
+            parts.append(low_str)
+
+        return "".join(parts).rstrip("零")
+
+    jiao = decimal_part // 10
+    fen = decimal_part % 10
+
+    if integer_part == 0:
+        if jiao == 0 and fen == 0:
+            return "零元整"
+        result = ""
+    else:
+        result = _int_to_chinese(integer_part) + "元"
+
+    if jiao == 0 and fen == 0:
+        result += "整"
+    else:
+        if jiao > 0:
+            result += nums[jiao] + "角"
+        if fen > 0:
+            if integer_part > 0 and jiao == 0:
+                result += "零"
+            result += nums[fen] + "分"
+
+    return result
