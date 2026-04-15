@@ -28,3 +28,13 @@ def authenticated_client(client):
         raise RuntimeError("access_token cookie not set")
     yield client
     client.post("/api/v1/auth/logout")
+
+
+@pytest.fixture
+def db_session():
+    from app.db.session import SessionLocal
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()

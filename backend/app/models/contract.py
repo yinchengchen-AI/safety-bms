@@ -67,7 +67,7 @@ class ContractTemplate(Base, TimestampMixin):
     is_default = Column(Boolean, default=False, comment="是否默认模板")
     created_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
-    service_type_obj = relationship("ServiceType")
+    service_type_obj = relationship("ServiceType", foreign_keys=[service_type])
     contracts = relationship("Contract", back_populates="template")
 
 

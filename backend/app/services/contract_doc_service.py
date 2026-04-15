@@ -277,12 +277,7 @@ def number_to_chinese_upper(amount) -> str:
 
         if low > 0:
             low_str = _four_digit_to_chinese(low)
-            need_pad = False
-            if mid > 0 and len(str(low)) < 4:
-                need_pad = True
-            elif high > 0 and mid == 0 and len(str(low)) < 4:
-                need_pad = True
-            if need_pad:
+            if mid > 0 and len(str(low)) < 4 and not low_str.startswith("零"):
                 low_str = "零" + low_str
             parts.append(low_str)
 
