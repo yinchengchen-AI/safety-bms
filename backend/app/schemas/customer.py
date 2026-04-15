@@ -45,6 +45,10 @@ class CustomerBase(BaseModel):
     credit_code: Optional[str] = None
     industry: Optional[str] = None
     scale: Optional[str] = None
+    province: Optional[str] = None
+    city: Optional[str] = None
+    district: Optional[str] = None
+    street: Optional[str] = None
     address: Optional[str] = None
     website: Optional[str] = None
     contact_name: Optional[str] = None
@@ -72,6 +76,10 @@ class CustomerUpdate(BaseModel):
     credit_code: Optional[str] = None
     industry: Optional[str] = None
     scale: Optional[str] = None
+    province: Optional[str] = None
+    city: Optional[str] = None
+    district: Optional[str] = None
+    street: Optional[str] = None
     address: Optional[str] = None
     website: Optional[str] = None
     contact_name: Optional[str] = None

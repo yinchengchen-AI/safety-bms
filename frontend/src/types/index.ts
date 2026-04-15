@@ -110,6 +110,10 @@ export interface Customer {
   credit_code?: string
   industry?: string
   scale?: string
+  province?: string
+  city?: string
+  district?: string
+  street?: string
   address?: string
   website?: string
   contact_name?: string
@@ -127,8 +131,14 @@ export interface CustomerCreate {
   credit_code?: string
   industry?: string
   scale?: string
+  province?: string
+  city?: string
+  district?: string
+  street?: string
   address?: string
   website?: string
+  contact_name?: string
+  contact_phone?: string
   status?: CustomerStatus
   remark?: string
   contacts?: Omit<CustomerContact, 'id' | 'customer_id' | 'created_at'>[]
