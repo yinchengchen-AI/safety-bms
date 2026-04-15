@@ -122,6 +122,7 @@ class ContractOut(ContractBase):
     status: ContractStatus
     file_url: Optional[str] = None
     template_id: Optional[int] = None
+    standard_doc_url: Optional[str] = None
     draft_doc_url: Optional[str] = None
     final_pdf_url: Optional[str] = None
     signed_at: Optional[datetime] = None
@@ -155,6 +156,7 @@ class ContractListOut(BaseModel):
     start_date: Optional[date] = None
     end_date: Optional[date] = None
     template_id: Optional[int] = None
+    standard_doc_url: Optional[str] = None
     draft_doc_url: Optional[str] = None
     final_pdf_url: Optional[str] = None
     created_at: datetime
