@@ -148,7 +148,7 @@ export interface CustomerCreate {
 export interface ContractTemplate {
   id: number
   name: string
-  service_type: ServiceType
+  service_type: number
   file_url: string
   is_default: boolean
   created_at: string

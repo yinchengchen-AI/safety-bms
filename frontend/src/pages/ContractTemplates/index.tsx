@@ -1,14 +1,14 @@
-import React, { useState } from 'react'
+import React, { useState, useMemo } from 'react'
 import { Table, Button, Space, Select, Input, message, Modal, Form, Upload, Tag } from 'antd'
 import { PlusOutlined, UploadOutlined, DeleteOutlined, EyeOutlined } from '@ant-design/icons'
 import { PermissionButton } from '@/components/auth/PermissionButton'
 import { useListContractTemplatesQuery, useCreateContractTemplateMutation, useUploadContractTemplateFileMutation, useDeleteContractTemplateMutation, useLazyGetTemplateDownloadUrlQuery } from '@/store/api/contractTemplatesApi'
-import { ServiceTypeLabels } from '@/utils/constants'
-import type { ContractTemplate, ServiceType } from '@/types'
+import { useListServiceTypesQuery } from '@/store/api/serviceTypesApi'
+import type { ContractTemplate } from '@/types'
 
 const ContractTemplates: React.FC = () => {
   const [page, setPage] = useState(1)
-  const [serviceType, setServiceType] = useState<ServiceType | undefined>()
+  const [serviceType, setServiceType] = useState<number | undefined>()
   const [createOpen, setCreateOpen] = useState(false)
   const [createFile, setCreateFile] = useState<File | null>(null)
   const [previewOpen, setPreviewOpen] = useState(false)
@@ -20,8 +20,19 @@ const ContractTemplates: React.FC = () => {
   const [uploadTemplateFile, { isLoading: uploading }] = useUploadContractTemplateFileMutation()
   const [deleteTemplate] = useDeleteContractTemplateMutation()
   const [getDownloadUrl, { isFetching: previewLoading }] = useLazyGetTemplateDownloadUrlQuery()
+  const { data: serviceTypesData } = useListServiceTypesQuery({ page_size: 200 })
 
-  const handleCreate = async (values: { name: string; service_type: ServiceType }) => {
+  const serviceTypeMap = useMemo(() => {
+    const map = new Map<number, string>()
+    serviceTypesData?.items?.forEach((st) => map.set(st.id, st.name))
+    return map
+  }, [serviceTypesData])
+
+  const serviceTypeOptions = useMemo(() => {
+    return serviceTypesData?.items?.map((st) => ({ value: st.id, label: st.name })) || []
+  }, [serviceTypesData])
+
+  const handleCreate = async (values: { name: string; service_type: number }) => {
     try {
       const result = await createTemplate({ ...values, is_default: false }).unwrap()
       if (createFile && result.id) {
@@ -57,7 +68,7 @@ const ContractTemplates: React.FC = () => {
 
   const columns = [
     { title: '模板名称', dataIndex: 'name', key: 'name' },
-    { title: '服务类型', dataIndex: 'service_type', key: 'service_type', render: (s: ServiceType) => ServiceTypeLabels[s] },
+    { title: '服务类型', dataIndex: 'service_type', key: 'service_type', render: (s: number) => serviceTypeMap.get(s) || s },
     { title: '默认模板', dataIndex: 'is_default', key: 'is_default', render: (v: boolean) => v ? <Tag color="blue">是</Tag> : <Tag>否</Tag> },
     { title: '文件', dataIndex: 'file_url', key: 'file_url', render: (v: string | undefined) => v ? <Tag color="success">已上传</Tag> : <Tag color="warning">未上传</Tag> },
     { title: '创建时间', dataIndex: 'created_at', key: 'created_at' },
@@ -95,8 +106,8 @@ const ContractTemplates: React.FC = () => {
             placeholder="服务类型"
             allowClear
             style={{ width: 160 }}
-            onChange={setServiceType}
-            options={Object.entries(ServiceTypeLabels).map(([v, l]) => ({ value: v, label: l }))}
+            onChange={(v) => setServiceType(v)}
+            options={serviceTypeOptions}
           />
         </Space>
         <PermissionButton permission="contract:create" type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>新建模板</PermissionButton>
@@ -123,7 +134,8 @@ const ContractTemplates: React.FC = () => {
           </Form.Item>
           <Form.Item name="service_type" label="服务类型" rules={[{ required: true }]}>
             <Select
-              options={Object.entries(ServiceTypeLabels).map(([v, l]) => ({ value: v, label: l }))}
+              options={serviceTypeOptions}
+              placeholder="请选择服务类型"
             />
           </Form.Item>
           <Form.Item label="模板文件 (.docx)">

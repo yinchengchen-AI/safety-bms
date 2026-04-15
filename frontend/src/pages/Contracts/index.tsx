@@ -113,7 +113,7 @@ const Contracts: React.FC = () => {
   const [deleteContract] = useDeleteContractMutation()
   const [updateStatus] = useUpdateContractStatusMutation()
 
-  const getTemplateOptions = (serviceType?: ServiceType) => {
+  const getTemplateOptions = (serviceType?: number) => {
     if (!templatesData?.items) return []
     return templatesData.items
       .filter((t) => !serviceType || t.service_type === serviceType)
@@ -274,7 +274,7 @@ const Contracts: React.FC = () => {
             {({ getFieldValue }) => (
               <Form.Item name="template_id" label="合同模板">
                 <Select allowClear showSearch optionFilterProp="label"
-                  options={getTemplateOptions(getFieldValue('service_type'))} />
+                  options={getTemplateOptions(getFieldValue('service_type') as number)} />
               </Form.Item>
             )}
           </Form.Item>
@@ -326,7 +326,7 @@ const Contracts: React.FC = () => {
             {({ getFieldValue }) => (
               <Form.Item name="template_id" label="合同模板">
                 <Select allowClear showSearch optionFilterProp="label"
-                  options={getTemplateOptions(getFieldValue('service_type'))} />
+                  options={getTemplateOptions(getFieldValue('service_type') as number)} />
               </Form.Item>
             )}
           </Form.Item>

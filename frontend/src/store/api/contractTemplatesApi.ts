@@ -1,15 +1,15 @@
 import { baseApi } from './baseApi'
-import type { ContractTemplate, ServiceType, PageResponse } from '@/types'
+import type { ContractTemplate, PageResponse } from '@/types'
 
 export interface ContractTemplateCreate {
   name: string
-  service_type: ServiceType
+  service_type: number
   is_default?: boolean
 }
 
 export const contractTemplatesApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
-    listContractTemplates: builder.query<PageResponse<ContractTemplate>, { page?: number; page_size?: number; service_type?: ServiceType }>({
+    listContractTemplates: builder.query<PageResponse<ContractTemplate>, { page?: number; page_size?: number; service_type?: number }>({
       query: (params) => ({ url: '/contract-templates', params }),
       providesTags: ['ContractTemplate'],
     }),
