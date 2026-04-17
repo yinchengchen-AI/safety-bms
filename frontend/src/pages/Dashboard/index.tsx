@@ -20,39 +20,107 @@ import {
 interface KPICardProps {
   title: string
   value: number | string
-  prefix: React.ReactNode
-  gradient: string
+  icon: React.ReactNode
+  color: 'blue' | 'green' | 'amber' | 'violet' | 'cyan' | 'rose'
   suffix?: string
   formatter?: (v: number | string) => string
+}
+
+const colorStyles: Record<KPICardProps['color'], { bg: string; text: string; border: string; bottom: string }> = {
+  blue:   { bg: '#eff6ff', text: '#2563eb', border: '#bfdbfe', bottom: 'linear-gradient(90deg,#2563eb,#60a5fa)' },
+  green:  { bg: '#f0fdf4', text: '#16a34a', border: '#bbf7d0', bottom: 'linear-gradient(90deg,#16a34a,#4ade80)' },
+  amber:  { bg: '#fffbeb', text: '#d97706', border: '#fde68a', bottom: 'linear-gradient(90deg,#d97706,#fbbf24)' },
+  violet: { bg: '#f5f3ff', text: '#7c3aed', border: '#ddd6fe', bottom: 'linear-gradient(90deg,#7c3aed,#a78bfa)' },
+  cyan:   { bg: '#ecfeff', text: '#0891b2', border: '#cffafe', bottom: 'linear-gradient(90deg,#0891b2,#22d3ee)' },
+  rose:   { bg: '#fff1f2', text: '#e11d48', border: '#fecdd3', bottom: 'linear-gradient(90deg,#e11d48,#fb7185)' },
 }
 
 const KPICard: React.FC<KPICardProps> = ({
   title,
   value,
-  prefix,
-  gradient,
+  icon,
+  color,
   suffix,
   formatter,
-}) => (
-  <Card
-    bodyStyle={{ padding: 20 }}
-    style={{
-      borderRadius: 12,
-      background: gradient,
-      border: 'none',
-      color: '#fff',
-    }}
-  >
-    <Statistic
-      title={<span style={{ color: 'rgba(255,255,255,0.85)', fontSize: 14 }}>{title}</span>}
-      value={value}
-      prefix={<span style={{ color: '#fff', fontSize: 18, marginRight: 8 }}>{prefix}</span>}
-      suffix={suffix ? <span style={{ color: 'rgba(255,255,255,0.85)', fontSize: 14 }}>{suffix}</span> : undefined}
-      valueStyle={{ color: '#fff', fontSize: 24, fontWeight: 700 }}
-      formatter={(v) => (formatter ? formatter(v as number) : String(v))}
-    />
-  </Card>
-)
+}) => {
+  const theme = colorStyles[color]
+  const display = formatter ? formatter(value as number) : String(value)
+  return (
+    <div
+      style={{
+        position: 'relative',
+        background: '#fff',
+        borderRadius: 16,
+        border: '1px solid #f1f5f9',
+        padding: '22px 22px 26px',
+        boxShadow: '0 1px 2px rgba(0,0,0,0.02), 0 4px 16px rgba(0,0,0,0.03)',
+        transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+        cursor: 'default',
+        overflow: 'hidden',
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.transform = 'translateY(-3px)'
+        e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.06)'
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.transform = 'translateY(0)'
+        e.currentTarget.style.boxShadow = '0 1px 2px rgba(0,0,0,0.02), 0 4px 16px rgba(0,0,0,0.03)'
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 500, color: '#64748b', letterSpacing: 0.2 }}>{title}</div>
+          <div
+            style={{
+              marginTop: 10,
+              fontSize: 28,
+              fontWeight: 700,
+              color: '#0f172a',
+              fontFamily: '"SF Pro Display", "Segoe UI", "PingFang SC", sans-serif',
+              fontVariantNumeric: 'tabular-nums',
+              letterSpacing: -0.5,
+              lineHeight: 1.1,
+            }}
+          >
+            {display}
+            {suffix && (
+              <span style={{ fontSize: 14, fontWeight: 500, color: '#94a3b8', marginLeft: 4 }}>{suffix}</span>
+            )}
+          </div>
+        </div>
+        <div
+          style={{
+            width: 44,
+            height: 44,
+            borderRadius: 12,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: theme.bg,
+            border: `1px solid ${theme.border}`,
+            color: theme.text,
+            fontSize: 20,
+            flexShrink: 0,
+          }}
+        >
+          {icon}
+        </div>
+      </div>
+
+      <div
+        style={{
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          bottom: 0,
+          height: 3,
+          background: theme.bottom,
+          opacity: 0.9,
+        }}
+      />
+    </div>
+  )
+}
 
 const Dashboard: React.FC = () => {
   const { data: stats, isLoading } = useGetDashboardStatsQuery()
@@ -234,8 +302,8 @@ const Dashboard: React.FC = () => {
           <KPICard
             title="本月开票金额"
             value={stats.monthly_invoice_amount || 0}
-            prefix={<FileTextOutlined />}
-            gradient="linear-gradient(135deg, #1890ff 0%, #36cfc9 100%)"
+            icon={<FileTextOutlined />}
+            color="blue"
             formatter={(v) => formatAmount(Number(v))}
           />
         </Col>
@@ -243,8 +311,8 @@ const Dashboard: React.FC = () => {
           <KPICard
             title="本月收款金额"
             value={stats.monthly_payment_amount || 0}
-            prefix={<DollarOutlined />}
-            gradient="linear-gradient(135deg, #52c41a 0%, #95de64 100%)"
+            icon={<DollarOutlined />}
+            color="green"
             formatter={(v) => formatAmount(Number(v))}
           />
         </Col>
@@ -252,8 +320,8 @@ const Dashboard: React.FC = () => {
           <KPICard
             title="总应收余额"
             value={stats.total_receivable || 0}
-            prefix={<RiseOutlined />}
-            gradient="linear-gradient(135deg, #fa8c16 0%, #ffc53d 100%)"
+            icon={<RiseOutlined />}
+            color="amber"
             formatter={(v) => formatAmount(Number(v))}
           />
         </Col>
@@ -261,8 +329,8 @@ const Dashboard: React.FC = () => {
           <KPICard
             title="本月新增客户"
             value={customerGrowthData.reduce((sum: number, d: any) => sum + d['新增客户数'], 0)}
-            prefix={<UserOutlined />}
-            gradient="linear-gradient(135deg, #722ed1 0%, #b37feb 100%)"
+            icon={<UserOutlined />}
+            color="violet"
             suffix="个"
           />
         </Col>
@@ -270,8 +338,8 @@ const Dashboard: React.FC = () => {
           <KPICard
             title="本月新增工单"
             value={(stats as any).monthly_new_service_orders || 0}
-            prefix={<ToolOutlined />}
-            gradient="linear-gradient(135deg, #13c2c2 0%, #5cdbd3 100%)"
+            icon={<ToolOutlined />}
+            color="cyan"
             suffix="个"
           />
         </Col>
@@ -279,8 +347,8 @@ const Dashboard: React.FC = () => {
           <KPICard
             title="逾期合同数"
             value={stats.overdue_contract_count || 0}
-            prefix={<ExclamationCircleOutlined />}
-            gradient="linear-gradient(135deg, #f5222d 0%, #ff7875 100%)"
+            icon={<ExclamationCircleOutlined />}
+            color="rose"
             suffix="个"
           />
         </Col>
