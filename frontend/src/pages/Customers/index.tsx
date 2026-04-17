@@ -124,7 +124,7 @@ const Customers: React.FC = () => {
       />
 
       {/* 新建客户 Drawer */}
-      <Drawer title="新建客户" open={createOpen} onClose={() => setCreateOpen(false)} width={520} footer={
+      <Drawer title="新建客户" open={createOpen} onClose={() => setCreateOpen(false)} width={640} footer={
         <Space style={{ float: 'right' }}>
           <Button onClick={() => setCreateOpen(false)}>取消</Button>
           <Button type="primary" loading={creating} onClick={() => form.submit()}>创建</Button>
@@ -178,7 +178,7 @@ const Customers: React.FC = () => {
 const CustomerDetail: React.FC<{ id: number; onClose: () => void }> = ({ id, onClose }) => {
   const { data } = useGetCustomerQuery(id)
   return (
-    <Drawer title="客户详情" open width={600} onClose={onClose}>
+    <Drawer title="客户详情" open width={720} onClose={onClose}>
       {data && (
         <Descriptions column={2} bordered size="small">
           <Descriptions.Item label="公司名称" span={2}>{data.name}</Descriptions.Item>
