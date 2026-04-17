@@ -147,7 +147,7 @@ const Users: React.FC = () => {
       <Table rowKey="id" columns={columns} dataSource={data?.items} loading={isLoading}
         pagination={{ current: page, pageSize: 20, total: data?.total, onChange: setPage, showTotal: (t) => `共 ${t} 条` }} />
 
-      <Drawer title="新建用户" open={createOpen} onClose={() => setCreateOpen(false)} width={480} footer={
+      <Drawer title="新建用户" open={createOpen} onClose={() => setCreateOpen(false)} width={640} footer={
         <Space style={{ float: 'right' }}>
           <Button onClick={() => setCreateOpen(false)}>取消</Button>
           <Button type="primary" loading={creating} onClick={() => form.submit()}>创建</Button>
@@ -169,7 +169,7 @@ const Users: React.FC = () => {
         </Form>
       </Drawer>
 
-      <Drawer title="编辑用户" open={editOpen} onClose={() => { setEditOpen(false); setEditingId(null) }} width={480} footer={
+      <Drawer title="编辑用户" open={editOpen} onClose={() => { setEditOpen(false); setEditingId(null) }} width={640} footer={
         <Space style={{ float: 'right' }}>
           <Button onClick={() => { setEditOpen(false); setEditingId(null) }}>取消</Button>
           <Button type="primary" loading={updating} onClick={() => editForm.submit()}>保存</Button>
