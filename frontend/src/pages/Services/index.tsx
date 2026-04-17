@@ -154,7 +154,7 @@ const Services: React.FC = () => {
       <Table rowKey="id" columns={columns} dataSource={data?.items} loading={isLoading}
         pagination={{ current: page, pageSize: 20, total: data?.total, onChange: setPage, showTotal: (t) => `共 ${t} 条` }} />
 
-      <Drawer title="新建服务工单" open={createOpen} onClose={() => setCreateOpen(false)} width={480} footer={
+      <Drawer title="新建服务工单" open={createOpen} onClose={() => setCreateOpen(false)} width={640} footer={
         <Space style={{ float: 'right' }}>
           <Button onClick={() => setCreateOpen(false)}>取消</Button>
           <Button type="primary" loading={creating} onClick={() => form.submit()}>创建</Button>
@@ -176,7 +176,7 @@ const Services: React.FC = () => {
         </Form>
       </Drawer>
 
-      <Drawer title="编辑服务工单" open={editOpen} onClose={() => setEditOpen(false)} width={480} footer={
+      <Drawer title="编辑服务工单" open={editOpen} onClose={() => setEditOpen(false)} width={640} footer={
         <Space style={{ float: 'right' }}>
           <Button onClick={() => setEditOpen(false)}>取消</Button>
           <Button type="primary" onClick={() => editForm.submit()}>保存</Button>
@@ -425,7 +425,7 @@ const ServiceDetail: React.FC<{ id: number; onClose: () => void }> = ({ id, onCl
   )
 
   return (
-    <Drawer title="工单详情" open width={700} onClose={onClose} footer={footerButtons}>
+    <Drawer title="工单详情" open width={720} onClose={onClose} footer={footerButtons}>
       <Tabs items={tabItems} />
       <Modal title={editingItem ? '编辑服务项' : '添加服务项'} open={itemModalOpen} onCancel={() => { setItemModalOpen(false); itemForm.resetFields(); setEditingItem(null) }} onOk={() => itemForm.submit()} destroyOnClose>
         <Form form={itemForm} layout="vertical" onFinish={handleItemSubmit}>
