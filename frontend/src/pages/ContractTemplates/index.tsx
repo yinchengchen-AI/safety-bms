@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react'
-import { Table, Button, Space, Select, Input, message, Modal, Form, Upload, Tag } from 'antd'
-import { PlusOutlined, UploadOutlined, DeleteOutlined, EyeOutlined } from '@ant-design/icons'
+import { Table, Button, Space, Select, Input, message, Drawer, Form, Upload, Tag, Popconfirm, Modal } from 'antd'
+import { PlusOutlined, UploadOutlined, EyeOutlined } from '@ant-design/icons'
 import { PermissionButton } from '@/components/auth/PermissionButton'
 import { useListContractTemplatesQuery, useCreateContractTemplateMutation, useUploadContractTemplateFileMutation, useDeleteContractTemplateMutation, useLazyGetTemplateDownloadUrlQuery } from '@/store/api/contractTemplatesApi'
 import { useListServiceTypesQuery } from '@/store/api/serviceTypesApi'
@@ -79,7 +79,7 @@ const ContractTemplates: React.FC = () => {
       render: (_: any, r: ContractTemplate) => (
         <Space>
           {r.file_url && (
-            <PermissionButton permission="contract:read" size="small" icon={<EyeOutlined />} onClick={() => handlePreview(r.id)}>预览</PermissionButton>
+            <PermissionButton permission="contract:read" type="link" size="small" icon={<EyeOutlined />} onClick={() => handlePreview(r.id)}>预览</PermissionButton>
           )}
           {!r.file_url && (
             <Upload
@@ -90,10 +90,12 @@ const ContractTemplates: React.FC = () => {
               showUploadList={false}
               accept=".docx"
             >
-              <PermissionButton permission="contract:update" size="small" icon={<UploadOutlined />}>上传</PermissionButton>
+              <PermissionButton permission="contract:update" type="link" size="small" icon={<UploadOutlined />}>上传</PermissionButton>
             </Upload>
           )}
-          <PermissionButton permission="contract:delete" danger size="small" icon={<DeleteOutlined />} onClick={() => handleDelete(r.id)}>删除</PermissionButton>
+          <Popconfirm title="确认删除？" onConfirm={() => handleDelete(r.id)}>
+            <PermissionButton permission="contract:delete" type="link" danger size="small">删除</PermissionButton>
+          </Popconfirm>
         </Space>
       ),
     },
@@ -122,12 +124,17 @@ const ContractTemplates: React.FC = () => {
         pagination={{ current: page, pageSize: 20, total: data?.total, onChange: setPage, showTotal: (t) => `共 ${t} 条` }}
       />
 
-      <Modal
+      <Drawer
         title="新建合同模板"
         open={createOpen}
-        onCancel={() => { setCreateOpen(false); form.resetFields(); setCreateFile(null) }}
-        onOk={() => form.submit()}
-        confirmLoading={creating || uploading}
+        onClose={() => { setCreateOpen(false); form.resetFields(); setCreateFile(null) }}
+        width={640}
+        footer={
+          <Space style={{ float: 'right' }}>
+            <Button onClick={() => { setCreateOpen(false); form.resetFields(); setCreateFile(null) }}>取消</Button>
+            <Button type="primary" loading={creating || uploading} onClick={() => form.submit()}>创建</Button>
+          </Space>
+        }
       >
         <Form form={form} layout="vertical" onFinish={handleCreate}>
           <Form.Item name="name" label="模板名称" rules={[{ required: true }]}>
@@ -150,7 +157,7 @@ const ContractTemplates: React.FC = () => {
             {createFile && <div style={{ marginTop: 8, color: '#52c41a' }}>已选择: {createFile.name}</div>}
           </Form.Item>
         </Form>
-      </Modal>
+      </Drawer>
 
       <Modal
         title="模板预览"
