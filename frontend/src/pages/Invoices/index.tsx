@@ -219,7 +219,7 @@ const Invoices: React.FC = () => {
       <Table rowKey="id" columns={columns} dataSource={data?.items} loading={isLoading}
         pagination={{ current: page, pageSize: 20, total: data?.total, onChange: setPage, showTotal: (t) => `共 ${t} 条` }} />
 
-      <Drawer title="新建开票申请" open={createOpen} onClose={() => { setCreateOpen(false); setCustomerId(undefined); setContractId(undefined) }} width={480} footer={
+      <Drawer title="新建开票申请" open={createOpen} onClose={() => { setCreateOpen(false); setCustomerId(undefined); setContractId(undefined) }} width={640} footer={
         <Space style={{ float: 'right' }}>
           <Button onClick={() => { setCreateOpen(false); setCustomerId(undefined); setContractId(undefined) }}>取消</Button>
           <Button type="primary" loading={creating} onClick={() => form.submit()}>提交</Button>
@@ -263,7 +263,7 @@ const Invoices: React.FC = () => {
         </Form>
       </Drawer>
 
-      <Drawer title="编辑发票" open={editOpen} onClose={() => { setEditOpen(false); setEditingId(null); setCustomerId(undefined); setContractId(undefined) }} width={480} footer={
+      <Drawer title="编辑发票" open={editOpen} onClose={() => { setEditOpen(false); setEditingId(null); setCustomerId(undefined); setContractId(undefined) }} width={640} footer={
         <Space style={{ float: 'right' }}>
           <Button onClick={() => { setEditOpen(false); setEditingId(null); setCustomerId(undefined); setContractId(undefined) }}>取消</Button>
           <Button type="primary" loading={updating} onClick={() => editForm.submit()}>保存</Button>
