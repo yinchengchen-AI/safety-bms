@@ -44,6 +44,14 @@ from app.schemas.analytics import (
 from app.utils.data_scope import apply_data_scope
 from app.utils.enum_format import enum_value
 from app.utils.excel_export import export_excel_response
+from app.utils.export_mappings import (
+    ANALYTICS_CATEGORY_MAP,
+    CONTRACT_STATUS_MAP,
+    CUSTOMER_STATUS_MAP,
+    INVOICE_STATUS_MAP,
+    SERVICE_ORDER_STATUS_MAP,
+    map_value,
+)
 
 router = APIRouter(prefix="/analytics", tags=["统计分析"])
 
@@ -1070,15 +1078,28 @@ def export_analytics_drilldown(
         date_to=date_to,
         service_type=service_type,
     )
+    def _map_drilldown_status(category: str, status: str | None) -> str:
+        if not status:
+            return ""
+        if category == "contract":
+            return map_value(status, CONTRACT_STATUS_MAP)
+        if category == "invoice":
+            return map_value(status, INVOICE_STATUS_MAP)
+        if category == "customer":
+            return map_value(status, CUSTOMER_STATUS_MAP)
+        if category == "service":
+            return map_value(status, SERVICE_ORDER_STATUS_MAP)
+        return status
+
     headers = ["类别", "主标签", "次标签", "金额", "日期", "状态", "附加信息"]
     rows = [
         [
-            item.category,
+            map_value(item.category, ANALYTICS_CATEGORY_MAP),
             item.primary_label,
             item.secondary_label or "",
             item.amount if item.amount is not None else "",
             item.date_label or "",
-            item.status or "",
+            _map_drilldown_status(item.category, item.status),
             item.extra or "",
         ]
         for item in items

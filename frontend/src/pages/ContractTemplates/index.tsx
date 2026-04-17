@@ -5,6 +5,7 @@ import { PermissionButton } from '@/components/auth/PermissionButton'
 import { useListContractTemplatesQuery, useCreateContractTemplateMutation, useUploadContractTemplateFileMutation, useDeleteContractTemplateMutation, useLazyGetTemplateDownloadUrlQuery } from '@/store/api/contractTemplatesApi'
 import { useListServiceTypesQuery } from '@/store/api/serviceTypesApi'
 import type { ContractTemplate } from '@/types'
+import { formatDateTime } from '@/utils/constants'
 
 const ContractTemplates: React.FC = () => {
   const [page, setPage] = useState(1)
@@ -71,7 +72,7 @@ const ContractTemplates: React.FC = () => {
     { title: '服务类型', dataIndex: 'service_type', key: 'service_type', render: (s: number) => serviceTypeMap.get(s) || s },
     { title: '默认模板', dataIndex: 'is_default', key: 'is_default', render: (v: boolean) => v ? <Tag color="blue">是</Tag> : <Tag>否</Tag> },
     { title: '文件', dataIndex: 'file_url', key: 'file_url', render: (v: string | undefined) => v ? <Tag color="success">已上传</Tag> : <Tag color="warning">未上传</Tag> },
-    { title: '创建时间', dataIndex: 'created_at', key: 'created_at' },
+    { title: '创建时间', dataIndex: 'created_at', key: 'created_at', render: (v: string) => formatDateTime(v) },
     {
       title: '操作',
       key: 'action',

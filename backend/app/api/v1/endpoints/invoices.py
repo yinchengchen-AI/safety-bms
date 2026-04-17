@@ -24,6 +24,7 @@ from app.services.notification_service import notification_service
 from app.utils.data_scope import apply_data_scope, check_data_scope
 from app.utils.pagination import make_page_response
 from app.utils.excel_export import export_excel_response
+from app.utils.export_mappings import INVOICE_STATUS_MAP, INVOICE_TYPE_MAP, map_value
 
 router = APIRouter(prefix="/invoices", tags=["开票管理"])
 
@@ -108,14 +109,14 @@ def export_invoices(
         rows.append(
             [
                 item.invoice_no,
-                item.invoice_type.value if item.invoice_type else "",
+                map_value(item.invoice_type.value if item.invoice_type else "", INVOICE_TYPE_MAP),
                 item.contract.customer.name
                 if item.contract and item.contract.customer
                 else "",
                 item.contract.contract_no if item.contract else "",
                 str(item.amount) if item.amount is not None else "",
                 str(item.tax_rate) if item.tax_rate is not None else "",
-                item.status.value if item.status else "",
+                map_value(item.status.value if item.status else "", INVOICE_STATUS_MAP),
                 item.invoice_date.strftime("%Y-%m-%d") if item.invoice_date else "",
                 item.created_at.strftime("%Y-%m-%d %H:%M") if item.created_at else "",
             ]

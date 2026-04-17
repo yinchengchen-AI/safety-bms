@@ -16,6 +16,7 @@ from app.api.v1.endpoints import (
     notifications,
     permissions,
     service_types,
+    reports,
 )
 
 api_router = APIRouter(prefix="/api/v1")
@@ -32,6 +33,7 @@ api_router.include_router(invoices.router)
 api_router.include_router(payments.router)
 api_router.include_router(dashboard.router)
 api_router.include_router(analytics.router)
+api_router.include_router(reports.router)
 api_router.include_router(notifications.router)
 api_router.include_router(permissions.router)
 api_router.include_router(service_types.router)

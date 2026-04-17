@@ -52,10 +52,23 @@ export const PaymentPlanLabels: Record<string, string> = {
   installment: '分期',
 }
 
+import dayjs from 'dayjs'
+
 // 格式化金额
 export const formatAmount = (amount: number | string | undefined): string => {
   if (amount === undefined || amount === null) return '¥0.00'
   return `¥${Number(amount).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+}
+
+// 格式化日期时间（自动将 UTC 转为本地北京时间）
+export const formatDateTime = (value?: string | null, template = 'YYYY-MM-DD HH:mm'): string => {
+  if (!value) return '-'
+  return dayjs(value).format(template)
+}
+
+// 格式化日期
+export const formatDate = (value?: string | null): string => {
+  return formatDateTime(value, 'YYYY-MM-DD')
 }
 
 // 自动生成业务编号

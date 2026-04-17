@@ -12,6 +12,7 @@ from app.models.user import User
 from app.utils.pagination import make_page_response
 from app.utils.data_scope import check_data_scope
 from app.utils.excel_export import export_excel_response
+from app.utils.export_mappings import USER_ROLE_MAP, map_value
 from app.core.constants import PermissionCode
 from app.core.security import verify_password, get_password_hash
 from app.services.minio_service import minio_service
@@ -60,7 +61,7 @@ def export_users(
             u.username, u.full_name or "", u.email or "", u.phone or "",
             u.department.name if u.department else "",
             "启用" if u.is_active else "禁用",
-            ", ".join([r.name for r in u.roles]) if u.roles else "",
+            ", ".join([map_value(r.name, USER_ROLE_MAP) for r in u.roles]) if u.roles else "",
             u.created_at.strftime("%Y-%m-%d %H:%M") if u.created_at else "",
         ])
     from datetime import datetime

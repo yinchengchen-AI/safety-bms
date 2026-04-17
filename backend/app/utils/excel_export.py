@@ -1,5 +1,7 @@
 from io import BytesIO
 from typing import List, Any
+from urllib.parse import quote
+
 from fastapi import Response
 from openpyxl import Workbook
 from openpyxl.styles import Font
@@ -38,8 +40,9 @@ def export_excel_response(filename: str, headers: List[str], rows: List[List[Any
     wb.save(buf)
     buf.seek(0)
 
+    encoded_filename = quote(filename)
     return Response(
         content=buf.getvalue(),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f"attachment; filename={filename}"},
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}"},
     )

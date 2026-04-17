@@ -24,6 +24,7 @@ import Permissions from '@/pages/Permissions'
 import Departments from '@/pages/Departments'
 import Profile from '@/pages/Profile'
 import Notifications from '@/pages/Notifications'
+import Reports from '@/pages/Reports'
 
 dayjs.locale('zh-cn')
 
@@ -47,6 +48,11 @@ const App = () => {
                   <Route path="/payments/*" element={<Payments />} />
                   <Route path="/profile" element={<Profile />} />
                   <Route path="/notifications" element={<Notifications />} />
+                </Route>
+              </Route>
+              <Route element={<PrivateRoute requiredPermissions={['report:read']} />}>
+                <Route element={<AppLayout />}>
+                  <Route path="/reports/*" element={<Reports />} />
                 </Route>
               </Route>
               <Route element={<PrivateRoute requiredPermissions={['analytics:read']} />}>

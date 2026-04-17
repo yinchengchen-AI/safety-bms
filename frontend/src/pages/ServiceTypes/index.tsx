@@ -9,6 +9,7 @@ import {
   useDeleteServiceTypeMutation,
 } from '@/store/api/serviceTypesApi'
 import type { ServiceTypeItem } from '@/store/api/serviceTypesApi'
+import { formatDateTime } from '@/utils/constants'
 
 const ServiceTypes: React.FC = () => {
   const [page, setPage] = useState(1)
@@ -106,7 +107,7 @@ const ServiceTypes: React.FC = () => {
       render: (v: boolean) =>
         v ? <Tag color="success">启用</Tag> : <Tag color="default">停用</Tag>,
     },
-    { title: '创建时间', dataIndex: 'created_at', key: 'created_at', width: 180 },
+    { title: '创建时间', dataIndex: 'created_at', key: 'created_at', width: 180, render: (v: string) => formatDateTime(v) },
     {
       title: '操作',
       key: 'action',

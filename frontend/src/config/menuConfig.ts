@@ -47,6 +47,7 @@ export const menuConfig: MenuItem[] = [
     ],
   },
   { key: '/analytics', icon: BarChartOutlined, label: '统计分析', path: '/analytics', requiredPermissions: ['analytics:read'] },
+  { key: '/reports', icon: FileTextOutlined, label: '报表中心', path: '/reports', requiredPermissions: ['report:read'] },
   {
     key: 'system',
     icon: SettingOutlined,

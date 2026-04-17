@@ -27,6 +27,7 @@ from app.services.notification_service import notification_service
 from app.utils.data_scope import apply_data_scope, check_data_scope
 from app.utils.pagination import make_page_response
 from app.utils.excel_export import export_excel_response
+from app.utils.export_mappings import SERVICE_ORDER_STATUS_MAP, map_value
 
 router = APIRouter(prefix="/services", tags=["服务管理"])
 
@@ -157,7 +158,7 @@ def export_service_orders(
                 else "",
                 item.service_type_obj.name if item.service_type_obj else "",
                 item.assignee.full_name if item.assignee else "",
-                item.status.value if item.status else "",
+                map_value(item.status.value if item.status else "", SERVICE_ORDER_STATUS_MAP),
                 item.planned_start.strftime("%Y-%m-%d") if item.planned_start else "",
                 item.planned_end.strftime("%Y-%m-%d") if item.planned_end else "",
                 item.created_at.strftime("%Y-%m-%d %H:%M") if item.created_at else "",

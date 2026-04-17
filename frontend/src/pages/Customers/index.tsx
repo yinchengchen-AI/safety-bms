@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react'
 import { Table, Button, Input, Select, Tag, Space, Popconfirm, message, Drawer, Form, Descriptions, Cascader } from 'antd'
 import { PlusOutlined } from '@ant-design/icons'
 import { useListCustomersQuery, useCreateCustomerMutation, useDeleteCustomerMutation, useGetCustomerQuery } from '@/store/api/customersApi'
-import { CustomerStatusLabels } from '@/utils/constants'
+import { CustomerStatusLabels, formatDate } from '@/utils/constants'
 import { hangzhouRegionOptions, getFullAddress } from '@/utils/hangzhouRegions'
 import type { CustomerListItem, CustomerStatus } from '@/types'
 
@@ -91,7 +91,7 @@ const Customers: React.FC = () => {
     { title: '状态', dataIndex: 'status', key: 'status', render: (s: CustomerStatus) => (
       <Tag color={statusColors[s]}>{CustomerStatusLabels[s]}</Tag>
     )},
-    { title: '创建时间', dataIndex: 'created_at', key: 'created_at', render: (d: string) => d?.slice(0, 10) },
+    { title: '创建时间', dataIndex: 'created_at', key: 'created_at', render: (d: string) => formatDate(d) },
     { title: '操作', key: 'action', render: (_: any, r: CustomerListItem) => (
       <Popconfirm title="确认删除该客户？" onConfirm={() => deleteCustomer(r.id)}>
         <Button type="link" danger size="small">删除</Button>

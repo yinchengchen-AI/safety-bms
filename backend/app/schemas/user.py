@@ -4,6 +4,17 @@ from datetime import datetime
 import re
 
 
+def _presign_avatar_url(v: Optional[str]) -> Optional[str]:
+    if isinstance(v, str) and v and not v.startswith("http"):
+        try:
+            from app.services.minio_service import minio_service
+
+            return minio_service.get_presigned_url(v)
+        except Exception:
+            return v
+    return v
+
+
 class RoleBase(BaseModel):
     name: str
     description: Optional[str] = None
@@ -72,6 +83,11 @@ class UserOut(UserBase):
     department_id: Optional[int] = None
 
     model_config = {"from_attributes": True}
+
+    @field_validator("avatar_url", mode="before")
+    @classmethod
+    def presign_avatar_url(cls, v):
+        return _presign_avatar_url(v)
 
 
 class UserLogin(BaseModel):

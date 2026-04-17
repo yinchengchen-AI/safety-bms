@@ -54,6 +54,7 @@ class PermissionCode(str, Enum):
     # dashboard
     DASHBOARD_READ = "dashboard:read"
     ANALYTICS_READ = "analytics:read"
+    REPORT_READ = "report:read"
 
 
 class DataScope(str, Enum):

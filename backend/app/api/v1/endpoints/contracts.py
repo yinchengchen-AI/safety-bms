@@ -22,6 +22,7 @@ from app.services.notification_service import notification_service
 from app.utils.data_scope import apply_data_scope, check_data_scope
 from app.utils.pagination import make_page_response
 from app.utils.excel_export import export_excel_response
+from app.utils.export_mappings import CONTRACT_STATUS_MAP, map_value
 
 router = APIRouter(prefix="/contracts", tags=["合同管理"])
 
@@ -112,7 +113,7 @@ def export_contracts(
             c.sign_date.strftime("%Y-%m-%d") if c.sign_date else "",
             c.start_date.strftime("%Y-%m-%d") if c.start_date else "",
             c.end_date.strftime("%Y-%m-%d") if c.end_date else "",
-            c.status.value if c.status else "",
+            map_value(c.status.value if c.status else "", CONTRACT_STATUS_MAP),
         ])
     from datetime import datetime
     return export_excel_response(f"contracts_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx", headers, rows)

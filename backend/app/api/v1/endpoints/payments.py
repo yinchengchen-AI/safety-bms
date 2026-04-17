@@ -18,6 +18,7 @@ from app.services.minio_service import minio_service
 from app.utils.data_scope import apply_data_scope, check_data_scope
 from app.utils.pagination import make_page_response
 from app.utils.excel_export import export_excel_response
+from app.utils.export_mappings import PAYMENT_METHOD_MAP, map_value
 
 router = APIRouter(prefix="/payments", tags=["收款管理"])
 
@@ -82,7 +83,7 @@ def export_payments(
             item.payment_no, item.contract.customer.name if item.contract and item.contract.customer else "",
             item.contract.contract_no if item.contract else "", str(item.amount) if item.amount is not None else "",
             item.payment_date.strftime("%Y-%m-%d") if item.payment_date else "",
-            item.payment_method.value if item.payment_method else "",
+            map_value(item.payment_method.value if item.payment_method else "", PAYMENT_METHOD_MAP),
             item.created_at.strftime("%Y-%m-%d %H:%M") if item.created_at else "",
         ])
     from datetime import datetime

@@ -18,6 +18,7 @@ from app.models.user import User
 from app.services.minio_service import minio_service
 from app.utils.pagination import make_page_response
 from app.utils.excel_export import export_excel_response
+from app.utils.export_mappings import CUSTOMER_STATUS_MAP, map_value
 
 router = APIRouter(prefix="/customers", tags=["客户管理"])
 
@@ -62,7 +63,7 @@ def export_customers(
     for c in items:
         rows.append([
             c.name, c.credit_code or "", c.industry or "", c.scale or "", c.address or "",
-            c.contact_name or "", c.contact_phone or "", c.status.value if c.status else "",
+            c.contact_name or "", c.contact_phone or "", map_value(c.status.value if c.status else "", CUSTOMER_STATUS_MAP),
             c.created_at.strftime("%Y-%m-%d %H:%M") if c.created_at else "",
         ])
     from datetime import datetime

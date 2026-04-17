@@ -4,7 +4,7 @@ import type { UploadProps } from 'antd'
 import { PlusOutlined, DeleteOutlined, EditOutlined, UploadOutlined, DownloadOutlined } from '@ant-design/icons'
 import { useListServiceOrdersQuery, useCreateServiceOrderMutation, useUpdateServiceStatusMutation, useGetServiceOrderQuery, useUpdateServiceOrderMutation, useDeleteServiceOrderMutation, useCreateServiceItemMutation, useUpdateServiceItemMutation, useDeleteServiceItemMutation, useDeleteServiceReportMutation } from '@/store/api/servicesApi'
 import { useListContractsQuery } from '@/store/api/contractsApi'
-import { ServiceOrderStatusLabels } from '@/utils/constants'
+import { ServiceOrderStatusLabels, formatDateTime } from '@/utils/constants'
 import type { ServiceOrder, ServiceOrderStatus, ServiceItem, ServiceReport } from '@/types'
 import dayjs from 'dayjs'
 import type { Dayjs } from 'dayjs'
@@ -395,7 +395,7 @@ const ServiceDetail: React.FC<{ id: number; onClose: () => void }> = ({ id, onCl
               <div key={report.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: '#f5f5f5', borderRadius: 4 }}>
                 <div>
                   <div style={{ fontWeight: 500 }}>{report.file_name}</div>
-                  <div style={{ fontSize: 12, color: '#999' }}>{report.created_at} {report.file_size ? ` - ${(report.file_size / 1024).toFixed(1)}KB` : ''}</div>
+                  <div style={{ fontSize: 12, color: '#999' }}>{formatDateTime(report.created_at)} {report.file_size ? ` - ${(report.file_size / 1024).toFixed(1)}KB` : ''}</div>
                 </div>
                 <Space>
                   <Button size="small" icon={<DownloadOutlined />} onClick={() => window.open(report.file_url, '_blank')}>下载</Button>

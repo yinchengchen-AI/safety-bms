@@ -9,7 +9,7 @@ import {
 } from '@/store/api/contractsApi'
 import { useListContractTemplatesQuery } from '@/store/api/contractTemplatesApi'
 import { useListCustomersQuery } from '@/store/api/customersApi'
-import { ContractStatusLabels, PaymentPlanLabels, formatAmount, generateBizNo } from '@/utils/constants'
+import { ContractStatusLabels, PaymentPlanLabels, formatAmount, formatDateTime, generateBizNo } from '@/utils/constants'
 import { downloadExport } from '@/utils/export'
 import ContractSignModal from '@/components/ContractSignModal'
 import { selectCurrentUser } from '@/store/slices/authSlice'
@@ -450,7 +450,7 @@ const ContractDetail: React.FC<{
         <Descriptions.Item label="签订日期">{data.sign_date || '-'}</Descriptions.Item>
         <Descriptions.Item label="服务期">{data.start_date || '-'} ~ {data.end_date || '-'}</Descriptions.Item>
         {data.signed_at && (
-          <Descriptions.Item label="签订时间" span={2}>{data.signed_at}</Descriptions.Item>
+          <Descriptions.Item label="签订时间" span={2}>{formatDateTime(data.signed_at)}</Descriptions.Item>
         )}
         <Descriptions.Item label="备注" span={2}>{data.remark}</Descriptions.Item>
         {data.standard_doc_url ? (

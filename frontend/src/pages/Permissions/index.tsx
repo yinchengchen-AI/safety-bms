@@ -1,6 +1,7 @@
 import React from 'react'
 import { Table } from 'antd'
 import { useListPermissionsQuery } from '@/store/api/permissionsApi'
+import { formatDateTime } from '@/utils/constants'
 
 const Permissions: React.FC = () => {
   const { data, isLoading } = useListPermissionsQuery({ page: 1, page_size: 200 })
@@ -13,7 +14,7 @@ const Permissions: React.FC = () => {
       title: '创建时间',
       dataIndex: 'created_at',
       key: 'created_at',
-      render: (v: string) => v ? new Date(v).toLocaleString() : '-',
+      render: (v: string) => formatDateTime(v),
     },
   ]
 
