@@ -29,6 +29,8 @@ const permissionGroups = [
   { label: '角色管理', prefix: 'role' },
   { label: '部门管理', prefix: 'department' },
   { label: '仪表盘', prefix: 'dashboard' },
+  { label: '统计分析', prefix: 'analytics' },
+  { label: '报表中心', prefix: 'report' },
 ]
 
 const predefinedRoles = ['admin', 'sales', 'service', 'finance', 'viewer']
