@@ -144,7 +144,7 @@ const Payments: React.FC = () => {
         },
       ]} />
 
-      <Drawer title="新建收款记录" open={createOpen} onClose={() => { setCreateOpen(false); setContractId(undefined) }} width={480} footer={
+      <Drawer title="新建收款记录" open={createOpen} onClose={() => { setCreateOpen(false); setContractId(undefined) }} width={640} footer={
         <Space style={{ float: 'right' }}>
           <Button onClick={() => { setCreateOpen(false); setContractId(undefined) }}>取消</Button>
           <Button type="primary" loading={creating} onClick={() => form.submit()}>创建</Button>
@@ -177,7 +177,7 @@ const Payments: React.FC = () => {
         </Form>
       </Drawer>
 
-      <Drawer title="编辑收款记录" open={editOpen} onClose={() => { setEditOpen(false); setEditingId(null); setContractId(undefined) }} width={480} footer={
+      <Drawer title="编辑收款记录" open={editOpen} onClose={() => { setEditOpen(false); setEditingId(null); setContractId(undefined) }} width={640} footer={
         <Space style={{ float: 'right' }}>
           <Button onClick={() => { setEditOpen(false); setEditingId(null); setContractId(undefined) }}>取消</Button>
           <Button type="primary" loading={updating} onClick={() => editForm.submit()}>保存</Button>
