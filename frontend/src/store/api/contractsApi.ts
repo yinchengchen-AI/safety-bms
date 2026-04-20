@@ -1,5 +1,5 @@
 import { baseApi } from './baseApi'
-import type { Contract, ContractCreate, PageResponse, ContractStatus, ContractSignRequest, ContractUploadSignedRequest } from '@/types'
+import type { Contract, ContractAttachmentCreate, ContractCreate, PageResponse, ContractStatus } from '@/types'
 
 export const contractsApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
@@ -34,16 +34,20 @@ export const contractsApi = baseApi.injectEndpoints({
       query: (id) => ({ url: `/contracts/${id}/generate-draft`, method: 'POST' }),
       invalidatesTags: (_, __, id) => [{ type: 'Contract', id }, 'Contract'],
     }),
-    signContract: builder.mutation<Contract, { id: number; data: ContractSignRequest }>({
-      query: ({ id, data }) => ({ url: `/contracts/${id}/sign`, method: 'POST', body: data }),
+    uploadContractAttachmentFile: builder.mutation<{ file_url: string; file_name: string; file_size: number }, { id: number; file: File }>({
+      query: ({ id, file }) => {
+        const formData = new FormData()
+        formData.append('file', file)
+        return { url: `/contracts/${id}/attachments/upload`, method: 'POST', body: formData }
+      },
+    }),
+    uploadContractAttachment: builder.mutation<Contract, { id: number; data: ContractAttachmentCreate }>({
+      query: ({ id, data }) => ({ url: `/contracts/${id}/attachments`, method: 'POST', body: data }),
       invalidatesTags: (_, __, { id }) => [{ type: 'Contract', id }, 'Contract'],
     }),
-    uploadSignedContract: builder.mutation<Contract, { id: number; data: ContractUploadSignedRequest }>({
-      query: ({ id, data }) => ({ url: `/contracts/${id}/upload-signed`, method: 'POST', body: data }),
+    deleteContractAttachment: builder.mutation<{ message: string }, { id: number; attachmentId: number }>({
+      query: ({ id, attachmentId }) => ({ url: `/contracts/${id}/attachments/${attachmentId}`, method: 'DELETE' }),
       invalidatesTags: (_, __, { id }) => [{ type: 'Contract', id }, 'Contract'],
-    }),
-    getContractPdfUrl: builder.query<{ url: string }, number>({
-      query: (id) => `/contracts/${id}/download-pdf`,
     }),
   }),
 })
@@ -57,7 +61,7 @@ export const {
   useDeleteContractMutation,
   useLazyGetContractDraftUrlQuery,
   useGenerateContractDraftMutation,
-  useSignContractMutation,
-  useUploadSignedContractMutation,
-  useLazyGetContractPdfUrlQuery,
+  useUploadContractAttachmentFileMutation,
+  useUploadContractAttachmentMutation,
+  useDeleteContractAttachmentMutation,
 } = contractsApi

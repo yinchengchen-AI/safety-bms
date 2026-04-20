@@ -1,9 +1,35 @@
-from sqlalchemy import Boolean, Column, Date, DateTime, ForeignKey, Integer, Numeric, String, Text
+from sqlalchemy import (
+    Boolean,
+    Column,
+    Date,
+    DateTime,
+    ForeignKey,
+    Integer,
+    Numeric,
+    String,
+    Text,
+    func,
+)
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import relationship
 
 from app.core.constants import ContractStatus, PaymentPlan
 from app.db.base import Base, SoftDeleteMixin, TimestampMixin
+
+
+class ContractAttachment(Base):
+    __tablename__ = "contract_attachments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    contract_id = Column(Integer, ForeignKey("contracts.id", ondelete="CASCADE"), nullable=False)
+    file_name = Column(String(255), nullable=False, comment="附件文件名")
+    file_url = Column(String(500), nullable=False, comment="附件文件路径")
+    file_type = Column(String(20), nullable=False, comment="draft / signed / other")
+    remark = Column(Text)
+    uploaded_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    uploaded_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    contract = relationship("Contract", back_populates="attachments")
 
 
 class Contract(Base, TimestampMixin, SoftDeleteMixin):
@@ -51,6 +77,12 @@ class Contract(Base, TimestampMixin, SoftDeleteMixin):
     customer = relationship("Customer", back_populates="contracts")
     service_type_obj = relationship("ServiceType")
     template = relationship("ContractTemplate", back_populates="contracts")
+    attachments = relationship(
+        "ContractAttachment",
+        back_populates="contract",
+        cascade="all, delete-orphan",
+        order_by="ContractAttachment.uploaded_at.asc()",
+    )
     changes = relationship(
         "ContractChange", back_populates="contract", cascade="all, delete-orphan"
     )

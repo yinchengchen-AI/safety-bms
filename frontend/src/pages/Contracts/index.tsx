@@ -1,22 +1,22 @@
 import React, { useState, useEffect } from 'react'
-import { Table, Button, Input, Select, Tag, Space, Popconfirm, message, Drawer, Form, InputNumber, DatePicker, Descriptions } from 'antd'
+import { Table, Button, Input, Select, Tag, Space, Popconfirm, message, Drawer, Form, InputNumber, DatePicker, Descriptions, Divider, Modal, Upload } from 'antd'
 import { PermissionButton } from '@/components/auth/PermissionButton'
-import { PlusOutlined, FileTextOutlined, FilePdfOutlined, PrinterOutlined, FormOutlined } from '@ant-design/icons'
+import { PlusOutlined, FileTextOutlined, UploadOutlined, DeleteOutlined, StopOutlined } from '@ant-design/icons'
 import {
   useListContractsQuery, useCreateContractMutation, useUpdateContractMutation, useDeleteContractMutation,
   useUpdateContractStatusMutation, useGetContractQuery,
-  useGenerateContractDraftMutation, useLazyGetContractPdfUrlQuery,
+  useGenerateContractDraftMutation,
+  useUploadContractAttachmentFileMutation,
+  useUploadContractAttachmentMutation,
+  useDeleteContractAttachmentMutation,
 } from '@/store/api/contractsApi'
 import { useListContractTemplatesQuery } from '@/store/api/contractTemplatesApi'
 import { useListCustomersQuery } from '@/store/api/customersApi'
 import { ContractStatusLabels, PaymentPlanLabels, formatAmount, formatDateTime, generateBizNo } from '@/utils/constants'
 import { downloadExport } from '@/utils/export'
-import ContractSignModal from '@/components/ContractSignModal'
-import { selectCurrentUser } from '@/store/slices/authSlice'
-import type { Contract, ContractStatus, PaymentPlan } from '@/types'
+import type { Contract, ContractStatus, PaymentPlan, ContractAttachment } from '@/types'
 import dayjs from 'dayjs'
 import type { Dayjs } from 'dayjs'
-import { useSelector } from 'react-redux'
 import { useListServiceTypesQuery } from '@/store/api/serviceTypesApi'
 
 interface ContractFormValues {
@@ -34,7 +34,11 @@ interface ContractFormValues {
 }
 
 const statusColors: Record<ContractStatus, string> = {
-  draft: 'default', review: 'processing', active: 'success', signed: 'purple', executing: 'blue', completed: 'green', terminated: 'error',
+  draft: 'default',
+  signed: 'purple',
+  executing: 'blue',
+  completed: 'green',
+  terminated: 'error',
 }
 
 const Contracts: React.FC = () => {
@@ -45,14 +49,14 @@ const Contracts: React.FC = () => {
   const [editOpen, setEditOpen] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [selectedId, setSelectedId] = useState<number | null>(null)
-  const [signModalOpen, setSignModalOpen] = useState(false)
-  const [signingContractId, setSigningContractId] = useState<number | null>(null)
-  const [signingContract, setSigningContract] = useState<Contract | null>(null)
-  const currentUser = useSelector(selectCurrentUser)
+  const [uploadOpen, setUploadOpen] = useState(false)
+  const [uploadingContractId, setUploadingContractId] = useState<number | null>(null)
+  const [uploadFile, setUploadFile] = useState<File | null>(null)
   const [form] = Form.useForm()
   const [editForm] = Form.useForm()
-  const [triggerPdfUrl] = useLazyGetContractPdfUrlQuery()
   const [generateDraft, { isLoading: generatingDraft }] = useGenerateContractDraftMutation()
+  const [uploadContractAttachmentFile] = useUploadContractAttachmentFileMutation()
+  const [uploadContractAttachment] = useUploadContractAttachmentMutation()
   const { data: serviceTypesData } = useListServiceTypesQuery({ page_size: 200 })
 
   const serviceTypeMap = React.useMemo(() => {
@@ -65,37 +69,6 @@ const Contracts: React.FC = () => {
     return serviceTypesData?.items?.map((st) => ({ value: st.id, label: st.name })) || []
   }, [serviceTypesData])
 
-  const openPdfPreview = async (id: number) => {
-    try {
-      const res = await triggerPdfUrl(id).unwrap()
-      if (res.url) {
-        window.open(res.url, '_blank')
-      } else {
-        message.error('获取PDF链接失败')
-      }
-    } catch (err: any) {
-      message.error(err?.data?.detail || '获取PDF失败')
-    }
-  }
-
-  const handlePrintPdf = async (id: number) => {
-    try {
-      const res = await triggerPdfUrl(id).unwrap()
-      if (res.url) {
-        const printWindow = window.open(res.url, '_blank')
-        if (printWindow) {
-          printWindow.onload = () => {
-            printWindow.print()
-          }
-        }
-      } else {
-        message.error('获取PDF链接失败')
-      }
-    } catch (err: any) {
-      message.error(err?.data?.detail || '获取PDF失败')
-    }
-  }
-
   const handleGenerateDraft = async (id: number) => {
     try {
       await generateDraft(id).unwrap()
@@ -105,10 +78,10 @@ const Contracts: React.FC = () => {
     }
   }
 
-  const handleOpenSign = (record: Contract) => {
-    setSigningContractId(record.id)
-    setSigningContract(record)
-    setSignModalOpen(true)
+  const handleOpenUpload = (record: Contract) => {
+    setUploadingContractId(record.id)
+    setUploadFile(null)
+    setUploadOpen(true)
   }
 
   useEffect(() => {
@@ -209,7 +182,7 @@ const Contracts: React.FC = () => {
       <Tag color={statusColors[s]}>{ContractStatusLabels[s]}</Tag>
     )},
     { title: '签订日期', dataIndex: 'sign_date', key: 'sign_date' },
-    { title: '操作', key: 'action', width: 280, render: (_: any, r: Contract) => (
+    { title: '操作', key: 'action', width: 320, render: (_: any, r: Contract) => (
       <Space wrap>
         {r.status === 'draft' && (
           <PermissionButton permission="contract:update" type="link" size="small" onClick={() => handleEdit(r)}>编辑</PermissionButton>
@@ -220,35 +193,34 @@ const Contracts: React.FC = () => {
           </Popconfirm>
         )}
         {r.status === 'draft' && (
-          <PermissionButton permission="contract:update" size="small" onClick={() => {
-            updateStatus({ id: r.id, status: 'review' }).unwrap()
-              .then(() => message.success('已提交审核，标准合同草稿已生成'))
-              .catch((err: any) => message.error(err?.data?.detail || '提交审核失败'))
-          }}>提交审核</PermissionButton>
-        )}
-        {r.status === 'review' && (
-          <>
-            <PermissionButton permission="contract:update" size="small" type="primary" onClick={() => updateStatus({ id: r.id, status: 'active' })}>审核通过</PermissionButton>
-            <PermissionButton permission="contract:update" size="small" onClick={() => updateStatus({ id: r.id, status: 'draft' })}>审核驳回</PermissionButton>
-          </>
-        )}
-        {r.status === 'draft' && (
           <PermissionButton permission="contract:update" size="small" icon={<FileTextOutlined />} onClick={() => handleGenerateDraft(r.id)} loading={generatingDraft}>生成草稿</PermissionButton>
         )}
-        {r.status === 'active' && (r.draft_doc_url || r.standard_doc_url) && (
-          <PermissionButton permission="contract:sign" size="small" type="primary" icon={<FormOutlined />} onClick={() => handleOpenSign(r)}>发起签订</PermissionButton>
+        {r.status === 'draft' && (
+          <PermissionButton permission="contract:update" size="small" icon={<UploadOutlined />} onClick={() => handleOpenUpload(r)}>上传已签附件</PermissionButton>
         )}
-        {(r.status === 'signed' || r.status === 'executing') && r.final_pdf_url && (
+        {r.status === 'draft' && (
+          <Popconfirm title="确认终止合同？" onConfirm={() => updateStatus({ id: r.id, status: 'terminated' })}>
+            <PermissionButton permission="contract:update" size="small" danger icon={<StopOutlined />}>终止</PermissionButton>
+          </Popconfirm>
+        )}
+        {r.status === 'signed' && (
           <>
-            <PermissionButton permission="contract:read" size="small" icon={<FilePdfOutlined />} onClick={() => openPdfPreview(r.id)}>下载PDF</PermissionButton>
-            <PermissionButton permission="contract:read" size="small" icon={<PrinterOutlined />} onClick={() => handlePrintPdf(r.id)}>打印</PermissionButton>
+            <PermissionButton permission="contract:update" size="small" type="primary" onClick={() => updateStatus({ id: r.id, status: 'executing' })}>开始履行</PermissionButton>
+            <Popconfirm title="确认终止合同？" onConfirm={() => updateStatus({ id: r.id, status: 'terminated' })}>
+              <PermissionButton permission="contract:update" size="small" danger icon={<StopOutlined />}>终止</PermissionButton>
+            </Popconfirm>
           </>
         )}
         {r.status === 'executing' && (
-          <PermissionButton permission="contract:update" size="small" type="primary" onClick={() => updateStatus({ id: r.id, status: 'completed' })}>标记完成</PermissionButton>
+          <>
+            <PermissionButton permission="contract:update" size="small" type="primary" onClick={() => updateStatus({ id: r.id, status: 'completed' })}>标记完成</PermissionButton>
+            <Popconfirm title="确认终止合同？" onConfirm={() => updateStatus({ id: r.id, status: 'terminated' })}>
+              <PermissionButton permission="contract:update" size="small" danger icon={<StopOutlined />}>终止</PermissionButton>
+            </Popconfirm>
+          </>
         )}
-        {r.status === 'signed' && (
-          <PermissionButton permission="contract:update" size="small" onClick={() => updateStatus({ id: r.id, status: 'executing' })}>开始履行</PermissionButton>
+        {(r.status === 'completed' || r.status === 'terminated') && (
+          <Button type="link" size="small" onClick={() => setSelectedId(r.id)}>查看详情</Button>
         )}
       </Space>
     )},
@@ -278,6 +250,7 @@ const Contracts: React.FC = () => {
         </Space>
       }>
         <Form form={form} layout="vertical" onFinish={handleCreate}>
+          <Divider orientation="left">基本信息</Divider>
           <Form.Item name="contract_no" label="合同编号" rules={[{ required: true }]}><Input disabled /></Form.Item>
           <Form.Item name="title" label="合同名称" rules={[{ required: true }]}><Input /></Form.Item>
           <Form.Item name="customer_id" label="客户" rules={[{ required: true }]}>
@@ -296,12 +269,14 @@ const Contracts: React.FC = () => {
               </Form.Item>
             )}
           </Form.Item>
+          <Divider orientation="left">商务信息</Divider>
           <Form.Item name="total_amount" label="合同金额(元)" rules={[{ required: true }]}>
             <InputNumber style={{ width: '100%' }} min={0} precision={2} />
           </Form.Item>
           <Form.Item name="payment_plan" label="付款方式" initialValue="once">
             <Select options={Object.entries(PaymentPlanLabels).map(([v, l]) => ({ value: v, label: l }))} />
           </Form.Item>
+          <Divider orientation="left">履约信息</Divider>
           <Form.Item name="sign_date" label="签订日期"><DatePicker style={{ width: '100%' }} /></Form.Item>
           <Form.Item name="start_date" label="服务开始日期" rules={[{ validator: (_, value) => {
             if (!value) return Promise.resolve()
@@ -319,6 +294,7 @@ const Contracts: React.FC = () => {
             }
             return Promise.resolve()
           }}]}><DatePicker style={{ width: '100%' }} /></Form.Item>
+          <Divider orientation="left">补充信息</Divider>
           <Form.Item name="remark" label="备注"><Input.TextArea rows={3} /></Form.Item>
         </Form>
       </Drawer>
@@ -330,6 +306,7 @@ const Contracts: React.FC = () => {
         </Space>
       }>
         <Form form={editForm} layout="vertical" onFinish={handleUpdate}>
+          <Divider orientation="left">基本信息</Divider>
           <Form.Item name="contract_no" label="合同编号" rules={[{ required: true }]}><Input /></Form.Item>
           <Form.Item name="title" label="合同名称" rules={[{ required: true }]}><Input /></Form.Item>
           <Form.Item name="customer_id" label="客户" rules={[{ required: true }]}>
@@ -348,12 +325,14 @@ const Contracts: React.FC = () => {
               </Form.Item>
             )}
           </Form.Item>
+          <Divider orientation="left">商务信息</Divider>
           <Form.Item name="total_amount" label="合同金额(元)" rules={[{ required: true }]}>
             <InputNumber style={{ width: '100%' }} min={0} precision={2} />
           </Form.Item>
           <Form.Item name="payment_plan" label="付款方式">
             <Select options={Object.entries(PaymentPlanLabels).map(([v, l]) => ({ value: v, label: l }))} />
           </Form.Item>
+          <Divider orientation="left">履约信息</Divider>
           <Form.Item name="sign_date" label="签订日期"><DatePicker style={{ width: '100%' }} /></Form.Item>
           <Form.Item name="start_date" label="服务开始日期" rules={[{ validator: (_, value) => {
             if (!value) return Promise.resolve()
@@ -371,6 +350,7 @@ const Contracts: React.FC = () => {
             }
             return Promise.resolve()
           }}]}><DatePicker style={{ width: '100%' }} /></Form.Item>
+          <Divider orientation="left">补充信息</Divider>
           <Form.Item name="remark" label="备注"><Input.TextArea rows={3} /></Form.Item>
         </Form>
       </Drawer>
@@ -379,22 +359,44 @@ const Contracts: React.FC = () => {
         id={selectedId}
         onClose={() => setSelectedId(null)}
         onGenerateDraft={handleGenerateDraft}
-        onOpenSign={handleOpenSign}
-        onOpenPdf={openPdfPreview}
-        onPrintPdf={handlePrintPdf}
+        onOpenUpload={handleOpenUpload}
         generatingDraft={generatingDraft}
       />}
 
-      {signingContractId && (
-        <ContractSignModal
-          contractId={signingContractId}
-          open={signModalOpen}
-          onClose={() => { setSignModalOpen(false); setSigningContractId(null); setSigningContract(null) }}
-          onOpenPdf={openPdfPreview}
-          partyANameDefault={currentUser?.full_name || currentUser?.username || ''}
-          partyBNameDefault={signingContract?.customer_name || ''}
-        />
-      )}
+      <Modal
+        title="上传已签合同附件"
+        open={uploadOpen}
+        onCancel={() => { setUploadOpen(false); setUploadingContractId(null); setUploadFile(null) }}
+        onOk={async () => {
+          if (!uploadFile || !uploadingContractId) return
+          try {
+            const uploadResult = await uploadContractAttachmentFile({ id: uploadingContractId, file: uploadFile }).unwrap()
+            await uploadContractAttachment({
+              id: uploadingContractId,
+              data: {
+                file_name: uploadResult.file_name,
+                file_url: uploadResult.file_url,
+                file_type: 'signed',
+              }
+            }).unwrap()
+            message.success('已签合同上传成功，合同已更新为已签订')
+            setUploadOpen(false)
+            setUploadingContractId(null)
+            setUploadFile(null)
+          } catch (err: any) {
+            message.error(err?.data?.detail || '上传失败')
+          }
+        }}
+        okButtonProps={{ disabled: !uploadFile }}
+      >
+        <Upload
+          beforeUpload={(file) => { setUploadFile(file); return false }}
+          onRemove={() => setUploadFile(null)}
+          fileList={uploadFile ? [{ uid: '-1', name: uploadFile.name, status: 'done' }] : []}
+        >
+          <Button icon={<UploadOutlined />}>选择文件</Button>
+        </Upload>
+      </Modal>
     </div>
   )
 }
@@ -403,48 +405,45 @@ const ContractDetail: React.FC<{
   id: number
   onClose: () => void
   onGenerateDraft: (id: number) => void
-  onOpenSign: (record: Contract) => void
-  onOpenPdf: (id: number) => void
-  onPrintPdf: (id: number) => void
+  onOpenUpload: (record: Contract) => void
   generatingDraft: boolean
-}> = ({ id, onClose, onGenerateDraft, onOpenSign, onOpenPdf, onPrintPdf, generatingDraft }) => {
+}> = ({ id, onClose, onGenerateDraft, onOpenUpload, generatingDraft }) => {
   const { data } = useGetContractQuery(id)
   const [updateStatus] = useUpdateContractStatusMutation()
+  const [deleteAttachment] = useDeleteContractAttachmentMutation()
   const { data: serviceTypesData } = useListServiceTypesQuery({ page_size: 200 })
   const serviceTypeMap = React.useMemo(() => {
     const map = new Map<number, string>()
     serviceTypesData?.items?.forEach((st) => map.set(st.id, st.name))
     return map
   }, [serviceTypesData])
+
   if (!data) return null
+
+  const draftAttachments = (data.attachments || []).filter((a: ContractAttachment) => a.file_type === 'draft')
+  const signedAttachments = (data.attachments || []).filter((a: ContractAttachment) => a.file_type === 'signed')
+  const latestDraft = draftAttachments[draftAttachments.length - 1]
 
   return (
     <Drawer title="合同详情" open width={720} onClose={onClose}
       extra={
         <Space>
-          {data.status === 'review' && (
-            <>
-              <PermissionButton permission="contract:update" type="primary" icon={<FormOutlined />} onClick={() => updateStatus({ id: data.id, status: 'active' })}>审核通过</PermissionButton>
-              <PermissionButton permission="contract:update" onClick={() => updateStatus({ id: data.id, status: 'draft' })}>审核驳回</PermissionButton>
-            </>
+          {data.status === 'draft' && (
+            <PermissionButton permission="contract:update" icon={<FileTextOutlined />} onClick={() => onGenerateDraft(data.id)} loading={generatingDraft}>生成草稿</PermissionButton>
           )}
-          {data.status === 'active' && (data.draft_doc_url || data.standard_doc_url) && (
-            <PermissionButton permission="contract:sign" type="primary" icon={<FormOutlined />} onClick={() => onOpenSign(data)}>发起签订</PermissionButton>
+          {data.status === 'draft' && (
+            <PermissionButton permission="contract:update" icon={<UploadOutlined />} onClick={() => onOpenUpload(data)}>上传已签附件</PermissionButton>
           )}
-          {(data.status === 'signed' || data.status === 'executing') && data.final_pdf_url && (
-            <>
-              <PermissionButton permission="contract:read" icon={<FilePdfOutlined />} onClick={() => onOpenPdf(data.id)}>下载PDF</PermissionButton>
-              <PermissionButton permission="contract:read" icon={<PrinterOutlined />} onClick={() => onPrintPdf(data.id)}>打印</PermissionButton>
-            </>
+          {data.status === 'signed' && (
+            <PermissionButton permission="contract:update" type="primary" onClick={() => updateStatus({ id: data.id, status: 'executing' })}>开始履行</PermissionButton>
           )}
           {data.status === 'executing' && (
             <PermissionButton permission="contract:update" type="primary" onClick={() => updateStatus({ id: data.id, status: 'completed' })}>标记完成</PermissionButton>
           )}
-          {data.status === 'signed' && (
-            <PermissionButton permission="contract:update" onClick={() => updateStatus({ id: data.id, status: 'executing' })}>开始履行</PermissionButton>
-          )}
-          {data.status === 'draft' && (
-            <PermissionButton permission="contract:update" icon={<FileTextOutlined />} onClick={() => onGenerateDraft(data.id)} loading={generatingDraft}>生成草稿</PermissionButton>
+          {(data.status === 'draft' || data.status === 'signed' || data.status === 'executing') && (
+            <Popconfirm title="确认终止合同？" onConfirm={() => updateStatus({ id: data.id, status: 'terminated' })}>
+              <PermissionButton permission="contract:update" danger>终止</PermissionButton>
+            </Popconfirm>
           )}
         </Space>
       }
@@ -465,15 +464,42 @@ const ContractDetail: React.FC<{
           <Descriptions.Item label="签订时间" span={2}>{formatDateTime(data.signed_at)}</Descriptions.Item>
         )}
         <Descriptions.Item label="备注" span={2}>{data.remark}</Descriptions.Item>
-        {data.standard_doc_url ? (
-          <Descriptions.Item label="标准合同草稿" span={2}>
-            <Button type="link" onClick={() => window.open(data.standard_doc_url, '_blank')}>下载标准合同草稿</Button>
-          </Descriptions.Item>
-        ) : (
-          <Descriptions.Item label="标准合同草稿" span={2}>
-            <span style={{ color: '#999' }}>尚未生成标准合同草稿（提交审核后自动生成）</span>
-          </Descriptions.Item>
-        )}
+      </Descriptions>
+
+      <Divider orientation="left">文件资料</Divider>
+      <Descriptions column={1} bordered size="small">
+        <Descriptions.Item label="合同草稿">
+          {latestDraft ? (
+            <Space>
+              <Button type="link" onClick={() => window.open(latestDraft.file_url, '_blank')}>下载草稿</Button>
+              <span style={{ color: '#999', fontSize: 12 }}>生成于 {formatDateTime(latestDraft.uploaded_at)}</span>
+            </Space>
+          ) : '未生成'}
+        </Descriptions.Item>
+        <Descriptions.Item label="已签附件">
+          {signedAttachments.length > 0 ? (
+            <Space direction="vertical" style={{ width: '100%' }}>
+              {signedAttachments.map((att: ContractAttachment) => (
+                <Space key={att.id}>
+                  <Button type="link" onClick={() => window.open(att.file_url, '_blank')}>{att.file_name}</Button>
+                  <span style={{ color: '#999', fontSize: 12 }}>上传于 {formatDateTime(att.uploaded_at)}</span>
+                  {data.status === 'draft' && (
+                    <Popconfirm title="确认删除？" onConfirm={async () => {
+                      try {
+                        await deleteAttachment({ id: data.id, attachmentId: att.id }).unwrap()
+                        message.success('删除成功')
+                      } catch (err: any) {
+                        message.error(err?.data?.detail || '删除失败')
+                      }
+                    }}>
+                      <Button type="link" danger size="small" icon={<DeleteOutlined />}>删除</Button>
+                    </Popconfirm>
+                  )}
+                </Space>
+              ))}
+            </Space>
+          ) : '未上传'}
+        </Descriptions.Item>
       </Descriptions>
     </Drawer>
   )

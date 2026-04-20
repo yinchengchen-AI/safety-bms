@@ -12,7 +12,7 @@ export interface ApiError {
 
 // ========== 枚举 ==========
 export type CustomerStatus = 'prospect' | 'signed' | 'churned'
-export type ContractStatus = 'draft' | 'review' | 'active' | 'signed' | 'executing' | 'completed' | 'terminated'
+export type ContractStatus = 'draft' | 'signed' | 'executing' | 'completed' | 'terminated'
 export type ServiceType = 'evaluation' | 'training' | 'inspection' | 'consulting' | 'emergency_plan'
 export type ServiceOrderStatus = 'pending' | 'in_progress' | 'completed' | 'accepted'
 export type InvoiceType = 'special' | 'general'
@@ -154,6 +154,24 @@ export interface ContractTemplate {
   created_at: string
 }
 
+export interface ContractAttachment {
+  id: number
+  contract_id: number
+  file_name: string
+  file_url: string
+  file_type: 'draft' | 'signed' | 'other'
+  remark?: string
+  uploaded_by?: number
+  uploaded_at: string
+}
+
+export interface ContractAttachmentCreate {
+  file_name: string
+  file_url: string
+  file_type: 'draft' | 'signed' | 'other'
+  remark?: string
+}
+
 export interface ContractSignature {
   id: number
   contract_id: number
@@ -188,6 +206,7 @@ export interface Contract {
   invoiced_amount?: number
   received_amount?: number
   signatures?: ContractSignature[]
+  attachments?: ContractAttachment[]
 }
 
 export interface ContractCreate {

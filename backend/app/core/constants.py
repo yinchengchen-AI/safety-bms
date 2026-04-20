@@ -79,12 +79,13 @@ class CustomerStatus(StrEnum):
 
 class ContractStatus(StrEnum):
     DRAFT = "draft"  # 草稿
-    REVIEW = "review"  # 审核中
-    ACTIVE = "active"  # 生效
     SIGNED = "signed"  # 已签订
     EXECUTING = "executing"  # 履行中
     COMPLETED = "completed"  # 已完成
     TERMINATED = "terminated"  # 终止
+    # 兼容旧代码路径，后续合同 API 重写完成后会移除。
+    REVIEW = DRAFT
+    ACTIVE = SIGNED
 
 
 class ServiceType(StrEnum):

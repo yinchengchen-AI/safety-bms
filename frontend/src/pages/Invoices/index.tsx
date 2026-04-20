@@ -40,17 +40,21 @@ const Invoices: React.FC = () => {
   }, [createOpen, form])
 
   const { data, isLoading, refetch } = useListInvoicesQuery({ page, page_size: 20, keyword, status })
-  const { data: contractsData } = useListContractsQuery({ page: 1, page_size: 200, status: 'active' })
+  const { data: contractsData } = useListContractsQuery({ page: 1, page_size: 200 })
   const { data: customersData } = useListCustomersQuery({ page: 1, page_size: 200 })
   const [createInvoice, { isLoading: creating, error: createError }] = useCreateInvoiceMutation()
   const [updateInvoice, { isLoading: updating }] = useUpdateInvoiceMutation()
   const [deleteInvoice] = useDeleteInvoiceMutation()
   const [auditInvoice, { isLoading: auditing }] = useAuditInvoiceMutation()
 
+  const activeContracts = useMemo(() => {
+    return contractsData?.items.filter(c => ['signed', 'executing', 'completed'].includes(c.status)) || []
+  }, [contractsData])
+
   const filteredContracts = useMemo(() => {
-    if (!customerId) return contractsData?.items || []
-    return contractsData?.items.filter(c => c.customer_id === customerId) || []
-  }, [customerId, contractsData])
+    if (!customerId) return activeContracts
+    return activeContracts.filter(c => c.customer_id === customerId)
+  }, [customerId, activeContracts])
 
   const selectedContract = contractsData?.items.find(c => c.id === contractId)
 

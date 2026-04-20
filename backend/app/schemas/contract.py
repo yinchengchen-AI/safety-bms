@@ -1,7 +1,8 @@
 from datetime import date, datetime
 from decimal import Decimal
+from typing import Literal
 
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, Field, model_validator
 
 from app.core.constants import ContractStatus, PaymentPlan
 
@@ -52,6 +53,26 @@ class ContractUpdate(BaseModel):
         if self.sign_date and self.end_date and self.sign_date > self.end_date:
             raise ValueError("结束日期不能早于签订日期")
         return self
+
+
+class ContractAttachmentCreate(BaseModel):
+    file_name: str
+    file_url: str
+    file_type: Literal["draft", "signed", "other"]
+    remark: str | None = None
+
+
+class ContractAttachmentOut(BaseModel):
+    id: int
+    contract_id: int
+    file_name: str
+    file_url: str
+    file_type: str
+    remark: str | None = None
+    uploaded_by: int | None = None
+    uploaded_at: datetime
+
+    model_config = {"from_attributes": True}
 
 
 class ContractStatusUpdate(BaseModel):
@@ -130,7 +151,8 @@ class ContractOut(ContractBase):
     signed_at: datetime | None = None
     created_at: datetime
     customer_name: str | None = None
-    signatures: list[ContractSignatureOut] = []
+    signatures: list[ContractSignatureOut] = Field(default_factory=list)
+    attachments: list[ContractAttachmentOut] = Field(default_factory=list)
     # 统计字段（由service层计算）
     invoiced_amount: Decimal | None = None
     received_amount: Decimal | None = None

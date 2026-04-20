@@ -7,24 +7,14 @@ from sqlalchemy.orm import Session, joinedload
 from app.core.constants import ContractStatus, InvoiceStatus
 from app.core.exceptions import ContractStatusError
 from app.crud.base import CRUDBase
-from app.models.contract import Contract, ContractChange, ContractTemplate
+from app.models.contract import Contract, ContractAttachment, ContractChange, ContractTemplate
 from app.models.invoice import Invoice
 from app.models.payment import Payment
 from app.schemas.contract import ContractCreate, ContractTemplateCreate, ContractUpdate
 
 ALLOWED_TRANSITIONS = {
-    ContractStatus.DRAFT: {ContractStatus.REVIEW, ContractStatus.TERMINATED},
-    ContractStatus.REVIEW: {
-        ContractStatus.ACTIVE,
-        ContractStatus.DRAFT,
-        ContractStatus.TERMINATED,
-    },
-    ContractStatus.ACTIVE: {ContractStatus.SIGNED, ContractStatus.TERMINATED},
-    ContractStatus.SIGNED: {
-        ContractStatus.EXECUTING,
-        ContractStatus.COMPLETED,
-        ContractStatus.TERMINATED,
-    },
+    ContractStatus.DRAFT: {ContractStatus.SIGNED, ContractStatus.TERMINATED},
+    ContractStatus.SIGNED: {ContractStatus.EXECUTING, ContractStatus.TERMINATED},
     ContractStatus.EXECUTING: {ContractStatus.COMPLETED, ContractStatus.TERMINATED},
     ContractStatus.COMPLETED: set(),
     ContractStatus.TERMINATED: set(),
@@ -83,13 +73,23 @@ class CRUDContract(CRUDBase[Contract, ContractCreate, ContractUpdate]):
         old_status = db_obj.status
         if new_status not in ALLOWED_TRANSITIONS.get(old_status, set()):
             raise ContractStatusError(f"状态不允许从 {old_status.value} 变更为 {new_status.value}")
+        if new_status == ContractStatus.SIGNED:
+            has_signed_attachment = (
+                db.query(ContractAttachment.id)
+                .filter(ContractAttachment.contract_id == db_obj.id)
+                .filter(ContractAttachment.file_type == "signed")
+                .first()
+                is not None
+            )
+            if not has_signed_attachment:
+                raise ContractStatusError("请先上传已签合同附件")
         db_obj.status = new_status
         change = ContractChange(
             contract_id=db_obj.id,
             changed_by=changed_by,
-            change_summary=f"状态变更: {old_status} → {new_status}",
-            before_status=old_status,
-            after_status=new_status,
+            change_summary=f"状态变更: {old_status.value} → {new_status.value}",
+            before_status=old_status.value,
+            after_status=new_status.value,
             remark=remark,
         )
         db.add(change)

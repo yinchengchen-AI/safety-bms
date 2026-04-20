@@ -34,8 +34,12 @@ class InvoiceService:
         )
         if not contract:
             raise NotFoundError("合同")
-        if getattr(contract, "status", None) != ContractStatus.ACTIVE:
-            raise ContractStatusError("只有生效状态的合同才能开票")
+        if getattr(contract, "status", None) not in {
+            ContractStatus.SIGNED,
+            ContractStatus.EXECUTING,
+            ContractStatus.COMPLETED,
+        }:
+            raise ContractStatusError("只有已签订或履行中的合同才能开票")
 
         # 2. 对已有发票加锁，防止并发超开
         db.query(Invoice).filter(

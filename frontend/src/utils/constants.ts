@@ -7,12 +7,10 @@ export const CustomerStatusLabels: Record<string, string> = {
 
 export const ContractStatusLabels: Record<string, string> = {
   draft: '草稿',
-  review: '审核中',
-  active: '已通过',
   signed: '已签订',
   executing: '履行中',
   completed: '已完成',
-  terminated: '终止',
+  terminated: '已终止',
 }
 
 export const ServiceTypeLabels: Record<string, string> = {

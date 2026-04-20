@@ -1,35 +1,31 @@
 import contextlib
-import logging
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, Query
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, File, Query, UploadFile
+from sqlalchemy.orm import Session, joinedload
 
 from app.core.constants import ContractStatus, PermissionCode
 from app.core.exceptions import BusinessError, DuplicateError, NotFoundError, PermissionDeniedError
 from app.crud.contract import crud_contract
 from app.db.session import get_db
 from app.dependencies import require_permissions
-from app.models.contract import Contract, ContractChange, ContractSignature, ContractTemplate
+from app.models.contract import Contract, ContractAttachment, ContractChange, ContractTemplate
 from app.models.invoice import Invoice
 from app.models.payment import Payment
 from app.models.service import ServiceOrder, ServiceOrderStatus
 from app.models.user import User
-from app.schemas.common import PageResponse, ResponseMsg
+from app.schemas.common import FileUploadResponse, PageResponse, ResponseMsg
 from app.schemas.contract import (
+    ContractAttachmentCreate,
     ContractCreate,
     ContractListOut,
     ContractOut,
-    ContractSignRequest,
     ContractStatusUpdate,
     ContractUpdate,
-    ContractUploadSignedRequest,
 )
 from app.services.contract_doc_service import (
-    insert_signatures_and_to_pdf,
     render_contract_draft,
     render_standard_contract_draft,
-    save_base64_signature_to_minio,
 )
 from app.services.minio_service import minio_service
 from app.services.notification_service import notification_service
@@ -52,6 +48,9 @@ def _enrich_contract_out(contract, out: ContractOut) -> ContractOut:
             out.standard_doc_url = minio_service.get_presigned_url(contract.standard_doc_url)
         except Exception:
             out.standard_doc_url = None
+    for att in out.attachments:
+        with contextlib.suppress(Exception):
+            att.file_url = minio_service.get_presigned_url(att.file_url)
     return out
 
 
@@ -163,8 +162,13 @@ def get_contract(
     current_user: User = Depends(require_permissions(PermissionCode.CONTRACT_READ)),
     db: Session = Depends(get_db),
 ):
-    contract = crud_contract.get(db, id=contract_id)
-    if not contract or contract.is_deleted:
+    contract = (
+        db.query(Contract)
+        .options(joinedload(Contract.attachments))
+        .filter(Contract.id == contract_id, Contract.is_deleted == False)
+        .first()
+    )
+    if not contract:
         raise NotFoundError("合同")
     if not check_data_scope(contract, current_user):
         raise BusinessError("无权查看该记录", status_code=403)
@@ -187,13 +191,7 @@ def update_contract(
         raise NotFoundError("合同")
     if not check_data_scope(contract, current_user):
         raise PermissionDeniedError()
-    if contract.status in (
-        ContractStatus.REVIEW,
-        ContractStatus.ACTIVE,
-        ContractStatus.SIGNED,
-        ContractStatus.COMPLETED,
-        ContractStatus.TERMINATED,
-    ):
+    if contract.status in (ContractStatus.COMPLETED, ContractStatus.TERMINATED):
         raise BusinessError(f"{contract.status.value} 状态合同不可修改")
     if body.contract_no:
         existing = (
@@ -219,25 +217,6 @@ def update_contract_status(
     if not check_data_scope(contract, current_user):
         raise PermissionDeniedError()
     old_status = contract.status
-    # 提交审核时自动生草稿并校验模板
-    if body.status == ContractStatus.REVIEW and old_status == ContractStatus.DRAFT:
-        if contract.template_id:
-            template = (
-                db.query(ContractTemplate)
-                .filter(ContractTemplate.id == contract.template_id)
-                .first()
-            )
-            if not template or not template.file_url:
-                raise BusinessError("模板文件不存在")
-            draft_object_name = render_contract_draft(contract, template.file_url)
-            contract.draft_doc_url = draft_object_name
-        else:
-            try:
-                standard_object_name = render_standard_contract_draft(contract, db)
-                if standard_object_name:
-                    contract.standard_doc_url = standard_object_name
-            except Exception:
-                logging.getLogger(__name__).exception("标准合同草稿生成失败，不影响审核提交")
     if body.status == ContractStatus.COMPLETED and old_status in (
         ContractStatus.SIGNED,
         ContractStatus.EXECUTING,
@@ -256,8 +235,9 @@ def update_contract_status(
             raise BusinessError("存在未完成或未验收的服务工单，无法标记合同为已完成")
 
     if body.status == ContractStatus.TERMINATED and old_status in (
-        ContractStatus.ACTIVE,
+        ContractStatus.DRAFT,
         ContractStatus.SIGNED,
+        ContractStatus.EXECUTING,
     ):
         pending_orders = (
             db.query(ServiceOrder)
@@ -287,28 +267,16 @@ def update_contract_status(
         total_str = (
             format(contract.total_amount, ".2f") if contract.total_amount is not None else "0.00"
         )
-        if body.status == ContractStatus.ACTIVE:
+        if body.status == ContractStatus.SIGNED:
             notification_service.create(
                 db,
                 user_id=creator.id,
-                title="合同审核通过",
+                title="合同已签订",
                 content=(
-                    f"您的合同 {contract.title}（{contract.contract_no}）已通过审核。\n"
+                    f"您的合同 {contract.title}（{contract.contract_no}）已签订。\n"
                     f"{customer_line}"
                     f"合同总金额：{total_str} 元。"
                 ),
-            )
-        elif old_status == ContractStatus.REVIEW and body.status == ContractStatus.DRAFT:
-            remark_text = f"备注：{body.remark}" if body.remark else ""
-            notification_service.create(
-                db,
-                user_id=creator.id,
-                title="合同审核被驳回",
-                content=(
-                    f"您的合同 {contract.title}（{contract.contract_no}）审核未通过，已退回草稿。\n"
-                    f"{customer_line}"
-                    f"合同总金额：{total_str} 元。{remark_text}"
-                ).strip(),
             )
     if creator and body.status == ContractStatus.TERMINATED:
         total_str = (
@@ -383,32 +351,58 @@ def generate_contract_draft(
         if not template or not template.file_url:
             raise BusinessError("模板文件不存在")
         draft_object_name = render_contract_draft(contract, template.file_url)
-        updated = crud_contract.update(
-            db, db_obj=contract, obj_in={"draft_doc_url": draft_object_name}
-        )
+        crud_contract.update(db, db_obj=contract, obj_in={"draft_doc_url": draft_object_name})
     else:
         standard_object_name = render_standard_contract_draft(contract, db)
         if not standard_object_name:
             raise BusinessError("未找到默认合同模板，无法生成标准合同草稿")
-        updated = crud_contract.update(
-            db, db_obj=contract, obj_in={"standard_doc_url": standard_object_name}
-        )
+        crud_contract.update(db, db_obj=contract, obj_in={"standard_doc_url": standard_object_name})
+        draft_object_name = standard_object_name
 
-    result = ContractOut.model_validate(updated)
-    result.customer_name = updated.customer.name if updated.customer else None
+    db.add(
+        ContractAttachment(
+            contract_id=contract.id,
+            file_name=draft_object_name.rsplit("/", 1)[-1],
+            file_url=draft_object_name,
+            file_type="draft",
+            uploaded_by=current_user.id,
+        )
+    )
+    db.commit()
+    db.refresh(contract)
+
+    result = ContractOut.model_validate(contract)
+    _enrich_contract_out(contract, result)
     result.invoiced_amount = crud_contract.get_invoiced_amount(db, contract_id=contract_id)
     result.received_amount = crud_contract.get_received_amount(db, contract_id=contract_id)
     return result
 
 
-@router.post("/{contract_id}/sign", response_model=ContractOut)
-def sign_contract(
+@router.post("/{contract_id}/attachments/upload", response_model=FileUploadResponse)
+def upload_contract_attachment_file(
     contract_id: int,
-    body: ContractSignRequest,
-    current_user: User = Depends(require_permissions(PermissionCode.CONTRACT_SIGN)),
+    file: UploadFile = File(...),
+    current_user: User = Depends(require_permissions(PermissionCode.CONTRACT_UPDATE)),
     db: Session = Depends(get_db),
 ):
-    # 加行锁，防止并发重复签订
+    contract = (
+        db.query(Contract).filter(Contract.id == contract_id, Contract.is_deleted == False).first()
+    )
+    if not contract:
+        raise NotFoundError("合同")
+    if not check_data_scope(contract, current_user):
+        raise PermissionDeniedError()
+    result = minio_service.upload_file(file, prefix=f"contracts/{contract_id}/attachments")
+    return FileUploadResponse(**result)
+
+
+@router.post("/{contract_id}/attachments", response_model=ContractOut)
+def upload_contract_attachment(
+    contract_id: int,
+    body: ContractAttachmentCreate,
+    current_user: User = Depends(require_permissions(PermissionCode.CONTRACT_UPDATE)),
+    db: Session = Depends(get_db),
+):
     contract = (
         db.query(Contract)
         .filter(Contract.id == contract_id, Contract.is_deleted == False)
@@ -419,115 +413,76 @@ def sign_contract(
         raise NotFoundError("合同")
     if not check_data_scope(contract, current_user):
         raise PermissionDeniedError()
-    if contract.status == ContractStatus.SIGNED:
-        raise BusinessError("合同已签订")
-    if contract.status != ContractStatus.ACTIVE:
-        raise BusinessError("只有生效中的合同才能签订")
-    if not contract.draft_doc_url and not contract.standard_doc_url:
-        raise BusinessError("合同草稿不存在，请先生成草稿")
 
-    party_a_object_name = None
-    party_b_object_name = None
-    try:
-        party_a_object_name = save_base64_signature_to_minio(
-            body.party_a_signature_base64, prefix=f"contracts/{contract.id}/signatures"
-        )
-        party_b_object_name = save_base64_signature_to_minio(
-            body.party_b_signature_base64, prefix=f"contracts/{contract.id}/signatures"
-        )
+    attachment = ContractAttachment(
+        contract_id=contract.id,
+        file_name=body.file_name,
+        file_url=body.file_url,
+        file_type=body.file_type,
+        remark=body.remark,
+        uploaded_by=current_user.id,
+    )
+    db.add(attachment)
 
-        final_pdf_object_name = insert_signatures_and_to_pdf(
-            contract,
-            party_a_name=body.party_a_name,
-            party_a_signature_object_name=party_a_object_name,
-            party_b_name=body.party_b_name,
-            party_b_signature_object_name=party_b_object_name,
-        )
-
-        old_status = contract.status.value
-        now = datetime.now(UTC)
-
-        # 优先使用传入的签订日期，否则自动填充当天
-        update_fields: dict = {
-            "status": ContractStatus.SIGNED,
-            "signed_at": now,
-            "final_pdf_url": final_pdf_object_name,
-        }
-        if body.sign_date:
-            update_fields["sign_date"] = body.sign_date
-        elif contract.sign_date is None:
-            update_fields["sign_date"] = now.date()
-
-        updated = crud_contract.update(db, db_obj=contract, obj_in=update_fields)
-
-        sig_a = ContractSignature(
-            contract_id=contract.id,
-            party="party_a",
-            signed_by=body.party_a_name,
-            signature_url=party_a_object_name,
-            signed_at=now,
-        )
-        sig_b = ContractSignature(
-            contract_id=contract.id,
-            party="party_b",
-            signed_by=body.party_b_name,
-            signature_url=party_b_object_name,
-            signed_at=now,
-        )
-        db.add_all([sig_a, sig_b])
-
-        change = ContractChange(
-            contract_id=contract.id,
-            changed_by=current_user.id,
-            change_summary=f"状态变更: {old_status} → signed (合同签订)",
-            before_status=old_status,
-            after_status="signed",
-            remark="",
-        )
-        db.add(change)
-        db.commit()
-        db.refresh(updated)
-
-        creator = db.query(User).filter(User.id == contract.created_by).first()
-        if creator and creator.id != current_user.id:
-            notification_service.create(
-                db,
-                user_id=creator.id,
-                title="合同签订完成",
-                content=f"合同 {contract.title} 已完成签订。",
+    if body.file_type == "signed" and contract.status == ContractStatus.DRAFT:
+        contract.status = ContractStatus.SIGNED
+        contract.signed_at = datetime.now(UTC)
+        db.add(
+            ContractChange(
+                contract_id=contract.id,
+                changed_by=current_user.id,
+                change_summary="状态变更: draft → signed (上传已签合同附件)",
+                before_status="draft",
+                after_status="signed",
+                remark="",
             )
+        )
 
-        result = ContractOut.model_validate(updated)
-        result.customer_name = updated.customer.name if updated.customer else None
-        result.invoiced_amount = crud_contract.get_invoiced_amount(db, contract_id=contract_id)
-        result.received_amount = crud_contract.get_received_amount(db, contract_id=contract_id)
-        return result
-    except Exception:
-        # 清理已上传的临时签名图片
-        if party_a_object_name:
-            with contextlib.suppress(Exception):
-                minio_service.delete_file(party_a_object_name)
-        if party_b_object_name:
-            with contextlib.suppress(Exception):
-                minio_service.delete_file(party_b_object_name)
-        raise
+    db.commit()
+    db.refresh(contract)
+
+    result = ContractOut.model_validate(contract)
+    _enrich_contract_out(contract, result)
+    result.invoiced_amount = crud_contract.get_invoiced_amount(db, contract_id=contract_id)
+    result.received_amount = crud_contract.get_received_amount(db, contract_id=contract_id)
+    return result
 
 
-@router.get("/{contract_id}/download-pdf")
-def download_contract_pdf(
+@router.delete("/{contract_id}/attachments/{attachment_id}", response_model=ResponseMsg)
+def delete_contract_attachment(
     contract_id: int,
-    current_user: User = Depends(require_permissions(PermissionCode.CONTRACT_READ)),
+    attachment_id: int,
+    current_user: User = Depends(require_permissions(PermissionCode.CONTRACT_UPDATE)),
     db: Session = Depends(get_db),
 ):
-    contract = crud_contract.get(db, id=contract_id)
-    if not contract or contract.is_deleted:
+    contract = (
+        db.query(Contract).filter(Contract.id == contract_id, Contract.is_deleted == False).first()
+    )
+    if not contract:
         raise NotFoundError("合同")
     if not check_data_scope(contract, current_user):
         raise PermissionDeniedError()
-    if not contract.final_pdf_url:
-        raise NotFoundError("合同PDF文件")
-    url = minio_service.get_presigned_url(contract.final_pdf_url)
-    return {"url": url}
+
+    attachment = (
+        db.query(ContractAttachment)
+        .filter(
+            ContractAttachment.id == attachment_id, ContractAttachment.contract_id == contract_id
+        )
+        .first()
+    )
+    if not attachment:
+        raise NotFoundError("附件")
+
+    if attachment.file_type == "signed" and contract.status in {
+        ContractStatus.SIGNED,
+        ContractStatus.EXECUTING,
+        ContractStatus.COMPLETED,
+    }:
+        raise BusinessError("当前状态依赖已签合同附件，请先调整合同状态")
+
+    db.delete(attachment)
+    db.commit()
+    return {"message": "删除成功"}
 
 
 @router.delete("/{contract_id}", response_model=ResponseMsg)
@@ -550,70 +505,3 @@ def delete_contract(
         raise BusinessError("该合同存在关联的工单、发票或收款记录，不可删除")
     crud_contract.soft_delete(db, contract_id=contract_id)
     return {"message": "删除成功"}
-
-
-@router.post("/{contract_id}/upload-signed", response_model=ContractOut)
-def upload_signed_contract(
-    contract_id: int,
-    body: ContractUploadSignedRequest,
-    current_user: User = Depends(require_permissions(PermissionCode.CONTRACT_SIGN)),
-    db: Session = Depends(get_db),
-):
-    contract = (
-        db.query(Contract)
-        .filter(Contract.id == contract_id, Contract.is_deleted == False)
-        .with_for_update()
-        .first()
-    )
-    if not contract:
-        raise NotFoundError("合同")
-    if not check_data_scope(contract, current_user):
-        raise PermissionDeniedError()
-    if contract.status == ContractStatus.SIGNED:
-        raise BusinessError("合同已签订")
-    if contract.status != ContractStatus.ACTIVE:
-        raise BusinessError("只有生效中的合同才能确认签订")
-    if not contract.draft_doc_url and not contract.standard_doc_url:
-        raise BusinessError("合同草稿不存在，无法确认签订")
-
-    old_status = contract.status.value
-    now = datetime.now(UTC)
-    update_fields = {
-        "status": ContractStatus.SIGNED,
-        "signed_at": now,
-        "final_pdf_url": body.file_url,
-    }
-    # 优先使用传入的签订日期，否则自动填充当天
-    if body.sign_date:
-        update_fields["sign_date"] = body.sign_date
-    elif contract.sign_date is None:
-        update_fields["sign_date"] = now.date()
-
-    updated = crud_contract.update(db, db_obj=contract, obj_in=update_fields)
-
-    change = ContractChange(
-        contract_id=contract.id,
-        changed_by=current_user.id,
-        change_summary=f"状态变更: {old_status} → signed (上传盖章版)",
-        before_status=old_status,
-        after_status="signed",
-        remark="",
-    )
-    db.add(change)
-    db.commit()
-    db.refresh(updated)
-
-    creator = db.query(User).filter(User.id == contract.created_by).first()
-    if creator and creator.id != current_user.id:
-        notification_service.create(
-            db,
-            user_id=creator.id,
-            title="合同签订完成",
-            content=f"合同 {contract.title} 已通过上传盖章版完成签订。",
-        )
-
-    result = ContractOut.model_validate(updated)
-    result.customer_name = updated.customer.name if updated.customer else None
-    result.invoiced_amount = crud_contract.get_invoiced_amount(db, contract_id=contract_id)
-    result.received_amount = crud_contract.get_received_amount(db, contract_id=contract_id)
-    return result

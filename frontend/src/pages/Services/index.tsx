@@ -5,7 +5,7 @@ import { PlusOutlined, DeleteOutlined, EditOutlined, UploadOutlined, DownloadOut
 import { useListServiceOrdersQuery, useCreateServiceOrderMutation, useUpdateServiceStatusMutation, useGetServiceOrderQuery, useUpdateServiceOrderMutation, useDeleteServiceOrderMutation, useCreateServiceItemMutation, useUpdateServiceItemMutation, useDeleteServiceItemMutation, useDeleteServiceReportMutation } from '@/store/api/servicesApi'
 import { useListContractsQuery } from '@/store/api/contractsApi'
 import { ServiceOrderStatusLabels, formatDateTime } from '@/utils/constants'
-import type { ServiceOrder, ServiceOrderStatus, ServiceItem, ServiceReport } from '@/types'
+import type { ServiceOrder, ServiceOrderStatus, ServiceItem } from '@/types'
 import dayjs from 'dayjs'
 import type { Dayjs } from 'dayjs'
 import { useListServiceTypesQuery } from '@/store/api/serviceTypesApi'
@@ -43,11 +43,13 @@ const Services: React.FC = () => {
   const [editForm] = Form.useForm()
 
   const { data, isLoading, refetch } = useListServiceOrdersQuery({ page, page_size: 20, keyword, status })
-  const { data: contractsData } = useListContractsQuery({ page: 1, page_size: 200, status: 'active' })
+  const { data: contractsData } = useListContractsQuery({ page: 1, page_size: 200 })
   const [createServiceOrder, { isLoading: creating }] = useCreateServiceOrderMutation()
   const [updateServiceOrder] = useUpdateServiceOrderMutation()
   const [deleteServiceOrder] = useDeleteServiceOrderMutation()
-  const [updateStatus] = useUpdateServiceStatusMutation()
+  const activeContracts = React.useMemo(() => {
+    return contractsData?.items.filter(c => ['signed', 'executing', 'completed'].includes(c.status)) || []
+  }, [contractsData])
   const { data: serviceTypesData } = useListServiceTypesQuery({ page_size: 200 })
 
   const serviceTypeMap = React.useMemo(() => {
@@ -164,7 +166,7 @@ const Services: React.FC = () => {
           <Form.Item name="order_no" label="工单编号" rules={[{ required: true }]}><Input /></Form.Item>
           <Form.Item name="contract_id" label="关联合同" rules={[{ required: true }]}>
             <Select showSearch optionFilterProp="label"
-              options={contractsData?.items.map(c => ({ value: c.id, label: `${c.contract_no} - ${c.title}` })) || []} />
+              options={activeContracts.map(c => ({ value: c.id, label: `${c.contract_no} - ${c.title}` }))} />
           </Form.Item>
           <Form.Item name="service_type" label="服务类型" rules={[{ required: true }]}>
             <Select options={serviceTypeOptions} />
@@ -186,7 +188,7 @@ const Services: React.FC = () => {
           <Form.Item name="order_no" label="工单编号" rules={[{ required: true }]}><Input /></Form.Item>
           <Form.Item name="contract_id" label="关联合同" rules={[{ required: true }]}>
             <Select showSearch optionFilterProp="label"
-              options={contractsData?.items.map(c => ({ value: c.id, label: `${c.contract_no} - ${c.title}` })) || []} />
+              options={activeContracts.map(c => ({ value: c.id, label: `${c.contract_no} - ${c.title}` }))} />
           </Form.Item>
           <Form.Item name="service_type" label="服务类型" rules={[{ required: true }]}>
             <Select options={serviceTypeOptions} />

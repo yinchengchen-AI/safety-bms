@@ -27,8 +27,11 @@ const Payments: React.FC = () => {
 
   const { data, isLoading } = useListPaymentsQuery({ page, page_size: 20 })
   const { data: overdueData } = useListOverdueContractsQuery()
-  const { data: contractsData } = useListContractsQuery({ page: 1, page_size: 200, status: 'active' })
+  const { data: contractsData } = useListContractsQuery({ page: 1, page_size: 200 })
   const { data: receivableData } = useGetContractReceivableQuery(contractId ?? 0, { skip: !contractId })
+  const activeContracts = useMemo(() => {
+    return contractsData?.items.filter(c => ['signed', 'executing', 'completed'].includes(c.status)) || []
+  }, [contractsData])
   const [createPayment, { isLoading: creating }] = useCreatePaymentMutation()
   const [updatePayment, { isLoading: updating }] = useUpdatePaymentMutation()
   const [deletePayment] = useDeletePaymentMutation()
@@ -162,7 +165,7 @@ const Payments: React.FC = () => {
           <Form.Item name="payment_no" label="收款编号" rules={[{ required: true }]}><Input disabled /></Form.Item>
           <Form.Item name="contract_id" label="关联合同" rules={[{ required: true }]}>
             <Select showSearch optionFilterProp="label" onChange={(v) => setContractId(v)}
-              options={contractsData?.items.map(c => ({ value: c.id, label: `${c.contract_no} - ${c.title}` })) || []} />
+              options={activeContracts.map(c => ({ value: c.id, label: `${c.contract_no} - ${c.title}` }))} />
           </Form.Item>
           <Form.Item name="amount" label="收款金额(元)" rules={[{ required: true }, { type: 'number', min: 0.01, message: '收款金额必须大于0' }]}>
             <InputNumber style={{ width: '100%' }} min={0.01} precision={2} />
@@ -194,7 +197,7 @@ const Payments: React.FC = () => {
         <Form form={editForm} layout="vertical" onFinish={handleUpdate}>
           <Form.Item name="contract_id" label="关联合同" rules={[{ required: true }]}>
             <Select showSearch optionFilterProp="label" onChange={(v) => setContractId(v)}
-              options={contractsData?.items.map(c => ({ value: c.id, label: `${c.contract_no} - ${c.title}` })) || []} />
+              options={activeContracts.map(c => ({ value: c.id, label: `${c.contract_no} - ${c.title}` }))} />
           </Form.Item>
           <Form.Item name="amount" label="收款金额(元)" rules={[{ required: true }, { type: 'number', min: 0.01, message: '收款金额必须大于0' }]}>
             <InputNumber style={{ width: '100%' }} min={0.01} precision={2} />

@@ -78,7 +78,9 @@ class PaymentService:
             db.query(Contract)
             .filter(
                 Contract.is_deleted == False,
-                Contract.status == ContractStatus.ACTIVE,
+                Contract.status.in_(
+                    [ContractStatus.SIGNED, ContractStatus.EXECUTING, ContractStatus.COMPLETED]
+                ),
                 Contract.end_date < date.today(),
             )
             .all()
