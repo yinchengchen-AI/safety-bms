@@ -55,6 +55,11 @@ class CRUDRole(CRUDBase[Role, RoleCreate, RoleUpdate]):
         db.refresh(db_obj)
         return db_obj
 
+    def has_users(self, db: Session, *, role_id: int) -> bool:
+        from app.models.user import UserRole
+
+        return db.query(UserRole).filter(UserRole.role_id == role_id).first() is not None
+
     def is_predefined(self, role: Role) -> bool:
         return role.name.lower() in PREDEFINED_ROLES
 

@@ -10,21 +10,42 @@ from app.core.security import create_access_token, create_refresh_token, decode_
 from app.crud.user import crud_user
 from app.utils.redis_client import get_redis_client
 
-TOKEN_BLACKLIST_PREFIX = "token:blacklist:"
-REFRESH_TOKEN_PREFIX = "token:refresh:"
+TOKEN_BLACKLIST_PREFIX = "***"
+REFRESH_TOKEN_PREFIX = "***"
+LOGIN_FAIL_PREFIX = "login_fail:"
+LOGIN_LOCK_PREFIX = "login_lock:"
+MAX_LOGIN_FAILS = 5
+LOGIN_LOCK_SECONDS = 1800
 
 
 def _token_blacklist_key(token: str) -> str:
     return f"{TOKEN_BLACKLIST_PREFIX}{sha256(token.encode()).hexdigest()}"
 
 
+def _login_fail_key(username: str) -> str:
+    return f"{LOGIN_FAIL_PREFIX}{username}"
+
+
+def _login_lock_key(username: str) -> str:
+    return f"{LOGIN_LOCK_PREFIX}{username}"
+
+
 class AuthService:
     def login(self, db: Session, *, username: str, password: str) -> dict:
+        # 检查是否已锁定
+        lock_key = _login_lock_key(username)
+        if get_redis_client().exists(lock_key):
+            raise BusinessError("登录尝试次数过多，账号已锁定，请30分钟后重试", status_code=403)
+
         user = crud_user.authenticate(db, username=username, password=password)
         if not user:
+            self._record_login_fail(username)
             raise BusinessError("用户名或密码错误", status_code=401)
         if not user.is_active:
             raise BusinessError("账号已被禁用", status_code=403)
+
+        # 登录成功，清除失败记录
+        self._clear_login_fail(username)
 
         role_names = [r.name for r in user.roles]
         access_token = create_access_token(
@@ -49,6 +70,18 @@ class AuthService:
             "refresh_token": refresh_token,
             "token_type": "bearer",
         }
+
+    def _record_login_fail(self, username: str) -> None:
+        key = _login_fail_key(username)
+        redis = get_redis_client()
+        fails = redis.incr(key)
+        redis.expire(key, LOGIN_LOCK_SECONDS)
+        if fails >= MAX_LOGIN_FAILS:
+            redis.setex(_login_lock_key(username), LOGIN_LOCK_SECONDS, "1")
+
+    def _clear_login_fail(self, username: str) -> None:
+        get_redis_client().delete(_login_fail_key(username))
+        get_redis_client().delete(_login_lock_key(username))
 
     def logout(self, *, token: str) -> None:
         """将 access token 加入黑名单"""

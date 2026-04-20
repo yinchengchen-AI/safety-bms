@@ -89,5 +89,7 @@ def delete_role(
         raise NotFoundError("角色")
     if crud_role.is_predefined(role):
         raise BusinessError("预定义角色不能删除", status_code=403)
+    if crud_role.has_users(db, role_id=role_id):
+        raise BusinessError("该角色下存在关联用户，不可删除", status_code=403)
     crud_role.remove(db, id=role_id)
     return {"message": "删除成功"}

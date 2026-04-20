@@ -9,7 +9,7 @@ from app.db.session import get_db
 from app.dependencies import get_current_user, require_permissions
 from app.models.user import User
 from app.schemas.common import FileUploadResponse, PageResponse, ResponseMsg
-from app.schemas.user import PasswordChange, RoleOut, UserCreate, UserOut, UserUpdate
+from app.schemas.user import PasswordChange, PasswordReset, RoleOut, UserCreate, UserOut, UserUpdate
 from app.services.minio_service import minio_service
 from app.utils.data_scope import check_data_scope
 from app.utils.excel_export import export_excel_response
@@ -194,3 +194,22 @@ def delete_user(
         raise BusinessError("无权删除该用户", status_code=403)
     crud_user.remove(db, id=user_id)
     return {"message": "删除成功"}
+
+
+@router.post("/{user_id}/reset-password", response_model=ResponseMsg)
+def reset_user_password(
+    user_id: int,
+    body: PasswordReset,
+    current_user: User = Depends(require_permissions(PermissionCode.USER_UPDATE.value)),
+    db: Session = Depends(get_db),
+):
+    """管理员重置指定用户密码"""
+    user = crud_user.get(db, id=user_id)
+    if not user:
+        raise NotFoundError("用户")
+    if not check_data_scope(user, current_user):
+        raise BusinessError("无权修改该用户", status_code=403)
+    user.hashed_password = get_password_hash(body.new_password)
+    db.add(user)
+    db.commit()
+    return {"message": "密码重置成功"}

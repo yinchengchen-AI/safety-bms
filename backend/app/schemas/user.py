@@ -107,3 +107,16 @@ class PasswordChange(BaseModel):
         if not re.search(r"[A-Za-z]", v) or not re.search(r"\d", v):
             raise ValueError("密码必须同时包含字母和数字")
         return v
+
+
+class PasswordReset(BaseModel):
+    new_password: str
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_new_password(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("密码长度至少8位")
+        if not re.search(r"[A-Za-z]", v) or not re.search(r"\d", v):
+            raise ValueError("密码必须同时包含字母和数字")
+        return v

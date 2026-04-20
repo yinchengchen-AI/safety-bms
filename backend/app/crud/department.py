@@ -21,6 +21,11 @@ class CRUDDepartment(CRUDBase[Department, DepartmentCreate, DepartmentUpdate]):
         items = query.offset(skip).limit(limit).all()
         return total, items
 
+    def has_users(self, db: Session, *, department_id: int) -> bool:
+        from app.models.user import User
+
+        return db.query(User).filter(User.department_id == department_id).first() is not None
+
     def get_tree(self, db: Session) -> list[Department]:
         """获取所有部门（前端自行组装树或后端递归）"""
         return db.query(Department).all()

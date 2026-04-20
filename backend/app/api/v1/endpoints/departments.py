@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.core.constants import PermissionCode
-from app.core.exceptions import NotFoundError
+from app.core.exceptions import BusinessError, NotFoundError
 from app.crud.department import crud_department
 from app.db.session import get_db
 from app.dependencies import require_permissions
@@ -100,5 +100,7 @@ def delete_department(
     dept = crud_department.get(db, id=department_id)
     if not dept:
         raise NotFoundError("部门")
+    if crud_department.has_users(db, department_id=department_id):
+        raise BusinessError("该部门下存在关联用户，不可删除", status_code=403)
     crud_department.remove(db, id=department_id)
     return {"message": "删除成功"}
