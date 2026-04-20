@@ -13,7 +13,7 @@ from app.dependencies import require_permissions
 from app.models.contract import Contract, ContractChange, ContractSignature, ContractTemplate
 from app.models.invoice import Invoice
 from app.models.payment import Payment
-from app.models.service import ServiceOrder
+from app.models.service import ServiceOrder, ServiceOrderStatus
 from app.models.user import User
 from app.schemas.common import PageResponse, ResponseMsg
 from app.schemas.contract import (
@@ -238,6 +238,41 @@ def update_contract_status(
                     contract.standard_doc_url = standard_object_name
             except Exception:
                 logging.getLogger(__name__).exception("标准合同草稿生成失败，不影响审核提交")
+    if body.status == ContractStatus.COMPLETED and old_status in (
+        ContractStatus.SIGNED,
+        ContractStatus.EXECUTING,
+    ):
+        pending_orders = (
+            db.query(ServiceOrder)
+            .filter(
+                ServiceOrder.contract_id == contract_id,
+                ServiceOrder.status.not_in(
+                    [ServiceOrderStatus.COMPLETED, ServiceOrderStatus.ACCEPTED]
+                ),
+            )
+            .first()
+        )
+        if pending_orders:
+            raise BusinessError("存在未完成或未验收的服务工单，无法标记合同为已完成")
+
+    if body.status == ContractStatus.TERMINATED and old_status in (
+        ContractStatus.ACTIVE,
+        ContractStatus.SIGNED,
+    ):
+        pending_orders = (
+            db.query(ServiceOrder)
+            .filter(
+                ServiceOrder.contract_id == contract_id,
+                ServiceOrder.status.not_in(
+                    [ServiceOrderStatus.COMPLETED, ServiceOrderStatus.ACCEPTED]
+                ),
+            )
+            .first()
+        )
+        has_invoices = db.query(Invoice).filter(Invoice.contract_id == contract_id).first()
+        has_payments = db.query(Payment).filter(Payment.contract_id == contract_id).first()
+        if pending_orders or has_invoices or has_payments:
+            raise BusinessError("合同存在未完成的工单、发票或收款记录，请先处理完毕后再终止")
     updated = crud_contract.update_status(
         db,
         db_obj=contract,
@@ -285,6 +320,20 @@ def update_contract_status(
             title="合同已终止",
             content=(
                 f"您的合同 {contract.title}（{contract.contract_no}）已终止。\n"
+                f"{customer_line}"
+                f"合同总金额：{total_str} 元。"
+            ),
+        )
+    if creator and body.status == ContractStatus.COMPLETED:
+        total_str = (
+            format(contract.total_amount, ".2f") if contract.total_amount is not None else "0.00"
+        )
+        notification_service.create(
+            db,
+            user_id=creator.id,
+            title="合同已完成",
+            content=(
+                f"您的合同 {contract.title}（{contract.contract_no}）已标记为完成。\n"
                 f"{customer_line}"
                 f"合同总金额：{total_str} 元。"
             ),
@@ -390,13 +439,15 @@ def sign_contract(
         old_status = contract.status.value
         now = datetime.now(UTC)
 
-        # 自动填充签订日期
+        # 优先使用传入的签订日期，否则自动填充当天
         update_fields: dict = {
             "status": ContractStatus.SIGNED,
             "signed_at": now,
             "final_pdf_url": final_pdf_object_name,
         }
-        if contract.sign_date is None:
+        if body.sign_date:
+            update_fields["sign_date"] = body.sign_date
+        elif contract.sign_date is None:
             update_fields["sign_date"] = now.date()
 
         updated = crud_contract.update(db, db_obj=contract, obj_in=update_fields)
@@ -524,7 +575,10 @@ def upload_signed_contract(
         "signed_at": now,
         "final_pdf_url": body.file_url,
     }
-    if contract.sign_date is None:
+    # 优先使用传入的签订日期，否则自动填充当天
+    if body.sign_date:
+        update_fields["sign_date"] = body.sign_date
+    elif contract.sign_date is None:
         update_fields["sign_date"] = now.date()
 
     updated = crud_contract.update(db, db_obj=contract, obj_in=update_fields)

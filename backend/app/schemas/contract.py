@@ -95,6 +95,7 @@ class ContractSignRequest(BaseModel):
     party_a_signature_base64: str
     party_b_name: str
     party_b_signature_base64: str
+    sign_date: date | None = None
 
     @model_validator(mode="after")
     def check_signature_size(self):
@@ -109,6 +110,7 @@ class ContractSignRequest(BaseModel):
 
 class ContractUploadSignedRequest(BaseModel):
     file_url: str
+    sign_date: date | None = None
 
     @model_validator(mode="after")
     def check_file_url(self):

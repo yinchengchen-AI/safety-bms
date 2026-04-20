@@ -11,7 +11,8 @@ CONTRACT_STATUS_MAP = {
     "review": "审核中",
     "active": "已通过",
     "signed": "已签订",
-    "completed": "完成",
+    "executing": "履行中",
+    "completed": "已完成",
     "terminated": "终止",
 }
 

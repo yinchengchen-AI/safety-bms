@@ -12,7 +12,7 @@ export interface ApiError {
 
 // ========== 枚举 ==========
 export type CustomerStatus = 'prospect' | 'signed' | 'churned'
-export type ContractStatus = 'draft' | 'review' | 'active' | 'signed' | 'completed' | 'terminated'
+export type ContractStatus = 'draft' | 'review' | 'active' | 'signed' | 'executing' | 'completed' | 'terminated'
 export type ServiceType = 'evaluation' | 'training' | 'inspection' | 'consulting' | 'emergency_plan'
 export type ServiceOrderStatus = 'pending' | 'in_progress' | 'completed' | 'accepted'
 export type InvoiceType = 'special' | 'general'

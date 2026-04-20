@@ -20,7 +20,12 @@ ALLOWED_TRANSITIONS = {
         ContractStatus.TERMINATED,
     },
     ContractStatus.ACTIVE: {ContractStatus.SIGNED, ContractStatus.TERMINATED},
-    ContractStatus.SIGNED: {ContractStatus.COMPLETED, ContractStatus.TERMINATED},
+    ContractStatus.SIGNED: {
+        ContractStatus.EXECUTING,
+        ContractStatus.COMPLETED,
+        ContractStatus.TERMINATED,
+    },
+    ContractStatus.EXECUTING: {ContractStatus.COMPLETED, ContractStatus.TERMINATED},
     ContractStatus.COMPLETED: set(),
     ContractStatus.TERMINATED: set(),
 }

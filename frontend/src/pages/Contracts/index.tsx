@@ -34,7 +34,7 @@ interface ContractFormValues {
 }
 
 const statusColors: Record<ContractStatus, string> = {
-  draft: 'default', review: 'processing', active: 'success', signed: 'purple', completed: 'green', terminated: 'error',
+  draft: 'default', review: 'processing', active: 'success', signed: 'purple', executing: 'blue', completed: 'green', terminated: 'error',
 }
 
 const Contracts: React.FC = () => {
@@ -238,11 +238,17 @@ const Contracts: React.FC = () => {
         {r.status === 'active' && r.draft_doc_url && (
           <PermissionButton permission="contract:sign" size="small" type="primary" icon={<FormOutlined />} onClick={() => handleOpenSign(r)}>发起签订</PermissionButton>
         )}
-        {r.status === 'signed' && r.final_pdf_url && (
+        {(r.status === 'signed' || r.status === 'executing') && r.final_pdf_url && (
           <>
             <PermissionButton permission="contract:read" size="small" icon={<FilePdfOutlined />} onClick={() => openPdfPreview(r.id)}>下载PDF</PermissionButton>
             <PermissionButton permission="contract:read" size="small" icon={<PrinterOutlined />} onClick={() => handlePrintPdf(r.id)}>打印</PermissionButton>
           </>
+        )}
+        {r.status === 'executing' && (
+          <PermissionButton permission="contract:update" size="small" type="primary" onClick={() => updateStatus({ id: r.id, status: 'completed' })}>标记完成</PermissionButton>
+        )}
+        {r.status === 'signed' && (
+          <PermissionButton permission="contract:update" size="small" onClick={() => updateStatus({ id: r.id, status: 'executing' })}>开始履行</PermissionButton>
         )}
       </Space>
     )},
@@ -425,14 +431,20 @@ const ContractDetail: React.FC<{
           {data.status === 'active' && data.draft_doc_url && (
             <PermissionButton permission="contract:sign" type="primary" icon={<FormOutlined />} onClick={() => onOpenSign(data)}>发起签订</PermissionButton>
           )}
-          {data.status === 'draft' && data.template_id && (
-            <PermissionButton permission="contract:update" icon={<FileTextOutlined />} onClick={() => onGenerateDraft(data.id)} loading={generatingDraft}>生成草稿</PermissionButton>
-          )}
-          {data.status === 'signed' && data.final_pdf_url && (
+          {(data.status === 'signed' || data.status === 'executing') && data.final_pdf_url && (
             <>
               <PermissionButton permission="contract:read" icon={<FilePdfOutlined />} onClick={() => onOpenPdf(data.id)}>下载PDF</PermissionButton>
               <PermissionButton permission="contract:read" icon={<PrinterOutlined />} onClick={() => onPrintPdf(data.id)}>打印</PermissionButton>
             </>
+          )}
+          {data.status === 'executing' && (
+            <PermissionButton permission="contract:update" type="primary" onClick={() => updateStatus({ id: data.id, status: 'completed' })}>标记完成</PermissionButton>
+          )}
+          {data.status === 'signed' && (
+            <PermissionButton permission="contract:update" onClick={() => updateStatus({ id: data.id, status: 'executing' })}>开始履行</PermissionButton>
+          )}
+          {data.status === 'draft' && data.template_id && (
+            <PermissionButton permission="contract:update" icon={<FileTextOutlined />} onClick={() => onGenerateDraft(data.id)} loading={generatingDraft}>生成草稿</PermissionButton>
           )}
         </Space>
       }

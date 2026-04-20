@@ -82,7 +82,8 @@ class ContractStatus(StrEnum):
     REVIEW = "review"  # 审核中
     ACTIVE = "active"  # 生效
     SIGNED = "signed"  # 已签订
-    COMPLETED = "completed"  # 完成
+    EXECUTING = "executing"  # 履行中
+    COMPLETED = "completed"  # 已完成
     TERMINATED = "terminated"  # 终止
 
 
