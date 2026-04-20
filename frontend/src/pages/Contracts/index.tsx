@@ -235,7 +235,7 @@ const Contracts: React.FC = () => {
         {r.status === 'draft' && r.template_id && (
           <PermissionButton permission="contract:update" size="small" icon={<FileTextOutlined />} onClick={() => handleGenerateDraft(r.id)} loading={generatingDraft}>生成草稿</PermissionButton>
         )}
-        {r.status === 'active' && r.draft_doc_url && (
+        {r.status === 'active' && (r.draft_doc_url || r.standard_doc_url) && (
           <PermissionButton permission="contract:sign" size="small" type="primary" icon={<FormOutlined />} onClick={() => handleOpenSign(r)}>发起签订</PermissionButton>
         )}
         {(r.status === 'signed' || r.status === 'executing') && r.final_pdf_url && (
@@ -428,7 +428,7 @@ const ContractDetail: React.FC<{
               <PermissionButton permission="contract:update" onClick={() => updateStatus({ id: data.id, status: 'draft' })}>审核驳回</PermissionButton>
             </>
           )}
-          {data.status === 'active' && data.draft_doc_url && (
+          {data.status === 'active' && (data.draft_doc_url || data.standard_doc_url) && (
             <PermissionButton permission="contract:sign" type="primary" icon={<FormOutlined />} onClick={() => onOpenSign(data)}>发起签订</PermissionButton>
           )}
           {(data.status === 'signed' || data.status === 'executing') && data.final_pdf_url && (

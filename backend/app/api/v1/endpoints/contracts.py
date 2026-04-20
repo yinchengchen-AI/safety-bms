@@ -352,9 +352,9 @@ def get_contract_draft_url(
         raise NotFoundError("合同")
     if not check_data_scope(contract, current_user):
         raise PermissionDeniedError()
-    if not contract.draft_doc_url:
+    if not contract.draft_doc_url and not contract.standard_doc_url:
         raise NotFoundError("合同草稿")
-    url = minio_service.get_presigned_url(contract.draft_doc_url)
+    url = minio_service.get_presigned_url(contract.draft_doc_url or contract.standard_doc_url)
     return {"url": url}
 
 
@@ -415,7 +415,7 @@ def sign_contract(
         raise BusinessError("合同已签订")
     if contract.status != ContractStatus.ACTIVE:
         raise BusinessError("只有生效中的合同才能签订")
-    if not contract.draft_doc_url:
+    if not contract.draft_doc_url and not contract.standard_doc_url:
         raise BusinessError("合同草稿不存在，请先生成草稿")
 
     party_a_object_name = None
@@ -565,7 +565,7 @@ def upload_signed_contract(
         raise BusinessError("合同已签订")
     if contract.status != ContractStatus.ACTIVE:
         raise BusinessError("只有生效中的合同才能确认签订")
-    if not contract.draft_doc_url:
+    if not contract.draft_doc_url and not contract.standard_doc_url:
         raise BusinessError("合同草稿不存在，无法确认签订")
 
     old_status = contract.status.value
