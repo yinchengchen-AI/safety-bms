@@ -1,11 +1,11 @@
-import pytest
 from fastapi.testclient import TestClient
-from app.main import app
-from app.db.session import SessionLocal
-from app.db.base_all import Base  # noqa: F401
-from app.models.user import User, Role, Permission
-from app.core.security import get_password_hash
+
 from app.core.constants import PermissionCode
+from app.core.security import get_password_hash
+from app.db.base_all import Base  # noqa: F401
+from app.db.session import SessionLocal
+from app.main import app
+from app.models.user import Permission, Role, User
 
 client = TestClient(app)
 

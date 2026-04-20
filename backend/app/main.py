@@ -2,8 +2,8 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.config import settings
 from app.api.v1.router import api_router
+from app.config import settings
 from app.core.exceptions import BusinessError
 
 app = FastAPI(
@@ -23,6 +23,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 # 统一异常处理
 @app.exception_handler(BusinessError)
 async def business_error_handler(request: Request, exc: BusinessError):
@@ -30,6 +31,7 @@ async def business_error_handler(request: Request, exc: BusinessError):
         status_code=exc.status_code,
         content={"detail": exc.detail},
     )
+
 
 # 注册路由
 app.include_router(api_router)

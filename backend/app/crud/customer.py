@@ -1,14 +1,22 @@
-from typing import List, Optional, Tuple
+from datetime import UTC
+
 from sqlalchemy.orm import Session
 
+from app.core.constants import CustomerStatus
 from app.crud.base import CRUDBase
 from app.models.customer import Customer, CustomerContact, CustomerFollowUp
-from app.schemas.customer import CustomerCreate, CustomerUpdate, CustomerContactCreate, CustomerFollowUpCreate
-from app.core.constants import CustomerStatus
+from app.schemas.customer import (
+    CustomerContactCreate,
+    CustomerCreate,
+    CustomerFollowUpCreate,
+    CustomerUpdate,
+)
 
 
 class CRUDCustomer(CRUDBase[Customer, CustomerCreate, CustomerUpdate]):
-    def create(self, db: Session, *, obj_in: CustomerCreate, created_by: int | None = None) -> Customer:
+    def create(
+        self, db: Session, *, obj_in: CustomerCreate, created_by: int | None = None
+    ) -> Customer:
         contacts = obj_in.contacts
         data = obj_in.model_dump(exclude={"contacts"})
         db_obj = Customer(**data, created_by=created_by)
@@ -27,9 +35,9 @@ class CRUDCustomer(CRUDBase[Customer, CustomerCreate, CustomerUpdate]):
         *,
         skip: int = 0,
         limit: int = 20,
-        status: Optional[CustomerStatus] = None,
-        keyword: Optional[str] = None,
-    ) -> Tuple[int, List[Customer]]:
+        status: CustomerStatus | None = None,
+        keyword: str | None = None,
+    ) -> tuple[int, list[Customer]]:
         query = db.query(Customer).filter(Customer.is_deleted == False)
         if status:
             query = query.filter(Customer.status == status)
@@ -39,7 +47,9 @@ class CRUDCustomer(CRUDBase[Customer, CustomerCreate, CustomerUpdate]):
         items = query.order_by(Customer.created_at.desc()).offset(skip).limit(limit).all()
         return total, items
 
-    def add_contact(self, db: Session, *, customer_id: int, obj_in: CustomerContactCreate) -> CustomerContact:
+    def add_contact(
+        self, db: Session, *, customer_id: int, obj_in: CustomerContactCreate
+    ) -> CustomerContact:
         contact = CustomerContact(**obj_in.model_dump(), customer_id=customer_id)
         db.add(contact)
         db.commit()
@@ -57,7 +67,7 @@ class CRUDCustomer(CRUDBase[Customer, CustomerCreate, CustomerUpdate]):
         db.refresh(follow_up)
         return follow_up
 
-    def get_follow_ups(self, db: Session, *, customer_id: int) -> List[CustomerFollowUp]:
+    def get_follow_ups(self, db: Session, *, customer_id: int) -> list[CustomerFollowUp]:
         return (
             db.query(CustomerFollowUp)
             .filter(CustomerFollowUp.customer_id == customer_id)
@@ -66,11 +76,12 @@ class CRUDCustomer(CRUDBase[Customer, CustomerCreate, CustomerUpdate]):
         )
 
     def soft_delete(self, db: Session, *, customer_id: int) -> None:
-        from datetime import datetime, timezone
+        from datetime import datetime
+
         customer = db.query(Customer).get(customer_id)
         if customer:
             customer.is_deleted = True
-            customer.deleted_at = datetime.now(timezone.utc)
+            customer.deleted_at = datetime.now(UTC)
             db.commit()
 
 

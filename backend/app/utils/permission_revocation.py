@@ -1,8 +1,9 @@
 """
 权限撤销工具：当角色或用户权限变更时，强制相关用户重新登录。
 """
-from app.utils.redis_client import get_redis_client
+
 from app.services.auth_service import REFRESH_TOKEN_PREFIX
+from app.utils.redis_client import get_redis_client
 
 
 def revoke_user_refresh_tokens(user_ids: list[int]) -> None:

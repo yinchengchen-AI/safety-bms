@@ -1,12 +1,12 @@
-from typing import List, Optional
-from pydantic import BaseModel, field_validator
 from datetime import datetime
+
+from pydantic import BaseModel, field_validator
 
 
 class PermissionBase(BaseModel):
     code: str
     name: str
-    description: Optional[str] = None
+    description: str | None = None
 
 
 class PermissionCreate(PermissionBase):
@@ -14,8 +14,8 @@ class PermissionCreate(PermissionBase):
 
 
 class PermissionUpdate(BaseModel):
-    name: Optional[str] = None
-    description: Optional[str] = None
+    name: str | None = None
+    description: str | None = None
 
 
 class PermissionOut(PermissionBase):
@@ -27,8 +27,8 @@ class PermissionOut(PermissionBase):
 
 class RoleBase(BaseModel):
     name: str
-    description: Optional[str] = None
-    data_scope: Optional[str] = "SELF"
+    description: str | None = None
+    data_scope: str | None = "SELF"
 
     @field_validator("data_scope", mode="before")
     @classmethod
@@ -39,14 +39,14 @@ class RoleBase(BaseModel):
 
 
 class RoleCreate(RoleBase):
-    permission_ids: List[int] = []
+    permission_ids: list[int] = []
 
 
 class RoleUpdate(BaseModel):
-    name: Optional[str] = None
-    description: Optional[str] = None
-    data_scope: Optional[str] = None
-    permission_ids: Optional[List[int]] = None
+    name: str | None = None
+    description: str | None = None
+    data_scope: str | None = None
+    permission_ids: list[int] | None = None
 
     @field_validator("data_scope", mode="before")
     @classmethod
@@ -59,6 +59,6 @@ class RoleUpdate(BaseModel):
 class RoleOut(RoleBase):
     id: int
     created_at: datetime
-    permissions: List[PermissionOut] = []
+    permissions: list[PermissionOut] = []
 
     model_config = {"from_attributes": True}

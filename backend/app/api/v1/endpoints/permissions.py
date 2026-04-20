@@ -1,14 +1,13 @@
-from typing import Optional
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from app.db.session import get_db
-from app.schemas.role import PermissionCreate, PermissionUpdate, PermissionOut
-from app.schemas.common import PageResponse, ResponseMsg
+from app.core.exceptions import DuplicateError, NotFoundError
 from app.crud.permission import crud_permission
+from app.db.session import get_db
 from app.dependencies import require_permissions
-from app.core.exceptions import NotFoundError, DuplicateError
 from app.models.user import User
+from app.schemas.common import PageResponse, ResponseMsg
+from app.schemas.role import PermissionCreate, PermissionOut, PermissionUpdate
 from app.utils.pagination import make_page_response
 
 router = APIRouter(prefix="/permissions", tags=["权限管理"])
@@ -18,7 +17,7 @@ router = APIRouter(prefix="/permissions", tags=["权限管理"])
 def list_permissions(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=200),
-    keyword: Optional[str] = None,
+    keyword: str | None = None,
     _: User = Depends(require_permissions()),
     db: Session = Depends(get_db),
 ):

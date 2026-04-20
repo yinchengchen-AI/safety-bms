@@ -1,8 +1,9 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Numeric, Enum as SAEnum, Date, Boolean
+from sqlalchemy import Boolean, Column, Date, DateTime, ForeignKey, Integer, Numeric, String, Text
+from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import relationship
 
-from app.db.base import Base, TimestampMixin, SoftDeleteMixin
 from app.core.constants import ContractStatus, PaymentPlan
+from app.db.base import Base, SoftDeleteMixin, TimestampMixin
 
 
 class Contract(Base, TimestampMixin, SoftDeleteMixin):
@@ -35,7 +36,12 @@ class Contract(Base, TimestampMixin, SoftDeleteMixin):
     content = Column(Text, comment="合同正文摘要")
     remark = Column(Text)
     file_url = Column(String(500), comment="合同附件 MinIO 路径")
-    template_id = Column(Integer, ForeignKey("contract_templates.id", ondelete="SET NULL"), nullable=True, comment="关联模板ID")
+    template_id = Column(
+        Integer,
+        ForeignKey("contract_templates.id", ondelete="SET NULL"),
+        nullable=True,
+        comment="关联模板ID",
+    )
     draft_doc_url = Column(String(500), comment="待签文档 MinIO 路径")
     final_pdf_url = Column(String(500), comment="最终PDF MinIO 路径")
     standard_doc_url = Column(String(500), comment="标准合同草稿 MinIO 路径")
@@ -45,8 +51,12 @@ class Contract(Base, TimestampMixin, SoftDeleteMixin):
     customer = relationship("Customer", back_populates="contracts")
     service_type_obj = relationship("ServiceType")
     template = relationship("ContractTemplate", back_populates="contracts")
-    changes = relationship("ContractChange", back_populates="contract", cascade="all, delete-orphan")
-    signatures = relationship("ContractSignature", back_populates="contract", cascade="all, delete-orphan")
+    changes = relationship(
+        "ContractChange", back_populates="contract", cascade="all, delete-orphan"
+    )
+    signatures = relationship(
+        "ContractSignature", back_populates="contract", cascade="all, delete-orphan"
+    )
     service_orders = relationship("ServiceOrder", back_populates="contract")
     invoices = relationship("Invoice", back_populates="contract")
     payments = relationship("Payment", back_populates="contract")

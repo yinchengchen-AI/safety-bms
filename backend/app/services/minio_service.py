@@ -1,8 +1,10 @@
+import contextlib
 import uuid
 from io import BytesIO
+
+from fastapi import HTTPException, UploadFile
 from minio import Minio
 from minio.error import S3Error
-from fastapi import UploadFile, HTTPException
 
 from app.config import settings
 
@@ -48,9 +50,7 @@ class MinIOService:
                 )
 
             object_name = (
-                f"{prefix}/{uuid.uuid4().hex}.{ext}"
-                if prefix
-                else f"{uuid.uuid4().hex}.{ext}"
+                f"{prefix}/{uuid.uuid4().hex}.{ext}" if prefix else f"{uuid.uuid4().hex}.{ext}"
             )
             self.client.put_object(
                 self.bucket,
@@ -65,7 +65,7 @@ class MinIOService:
                 "file_size": file_size,
             }
         except S3Error as e:
-            raise HTTPException(status_code=500, detail=f"文件上传失败: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"文件上传失败: {str(e)}") from e
 
     def get_presigned_url(self, object_name: str, expires_seconds: int = 3600) -> str:
         """生成预签名下载URL"""
@@ -79,13 +79,11 @@ class MinIOService:
             )
             return url
         except S3Error as e:
-            raise HTTPException(status_code=500, detail=f"生成下载链接失败: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"生成下载链接失败: {str(e)}") from e
 
     def delete_file(self, object_name: str) -> None:
-        try:
+        with contextlib.suppress(S3Error):
             self.client.remove_object(self.bucket, object_name)
-        except S3Error:
-            pass
 
 
 minio_service = MinIOService()

@@ -1,7 +1,7 @@
-from typing import Optional, List
-from pydantic import BaseModel, model_validator
-from datetime import datetime, date
+from datetime import date, datetime
 from decimal import Decimal
+
+from pydantic import BaseModel, model_validator
 
 from app.core.constants import ContractStatus, PaymentPlan
 
@@ -13,11 +13,11 @@ class ContractBase(BaseModel):
     service_type: int
     total_amount: Decimal
     payment_plan: PaymentPlan = PaymentPlan.ONCE
-    start_date: Optional[date] = None
-    end_date: Optional[date] = None
-    sign_date: Optional[date] = None
-    content: Optional[str] = None
-    remark: Optional[str] = None
+    start_date: date | None = None
+    end_date: date | None = None
+    sign_date: date | None = None
+    content: str | None = None
+    remark: str | None = None
 
     @model_validator(mode="after")
     def check_dates(self):
@@ -29,21 +29,21 @@ class ContractBase(BaseModel):
 
 
 class ContractCreate(ContractBase):
-    template_id: Optional[int] = None
+    template_id: int | None = None
 
 
 class ContractUpdate(BaseModel):
-    contract_no: Optional[str] = None
-    title: Optional[str] = None
-    total_amount: Optional[Decimal] = None
-    payment_plan: Optional[PaymentPlan] = None
-    start_date: Optional[date] = None
-    end_date: Optional[date] = None
-    sign_date: Optional[date] = None
-    content: Optional[str] = None
-    remark: Optional[str] = None
-    file_url: Optional[str] = None
-    template_id: Optional[int] = None
+    contract_no: str | None = None
+    title: str | None = None
+    total_amount: Decimal | None = None
+    payment_plan: PaymentPlan | None = None
+    start_date: date | None = None
+    end_date: date | None = None
+    sign_date: date | None = None
+    content: str | None = None
+    remark: str | None = None
+    file_url: str | None = None
+    template_id: int | None = None
 
     @model_validator(mode="after")
     def check_dates(self):
@@ -56,7 +56,7 @@ class ContractUpdate(BaseModel):
 
 class ContractStatusUpdate(BaseModel):
     status: ContractStatus
-    remark: Optional[str] = None
+    remark: str | None = None
 
 
 class ContractTemplateCreate(BaseModel):
@@ -69,10 +69,10 @@ class ContractTemplateOut(BaseModel):
     id: int
     name: str
     service_type: int
-    service_type_id: Optional[int] = None
-    service_type_name: Optional[str] = None
-    service_type_code: Optional[str] = None
-    file_url: Optional[str] = None
+    service_type_id: int | None = None
+    service_type_name: str | None = None
+    service_type_code: str | None = None
+    file_url: str | None = None
     is_default: bool
     created_at: datetime
 
@@ -83,7 +83,7 @@ class ContractSignatureOut(BaseModel):
     id: int
     contract_id: int
     party: str
-    signed_by: Optional[str] = None
+    signed_by: str | None = None
     signature_url: str
     signed_at: datetime
 
@@ -120,21 +120,21 @@ class ContractUploadSignedRequest(BaseModel):
 class ContractOut(ContractBase):
     id: int
     status: ContractStatus
-    file_url: Optional[str] = None
-    template_id: Optional[int] = None
-    standard_doc_url: Optional[str] = None
-    draft_doc_url: Optional[str] = None
-    final_pdf_url: Optional[str] = None
-    signed_at: Optional[datetime] = None
+    file_url: str | None = None
+    template_id: int | None = None
+    standard_doc_url: str | None = None
+    draft_doc_url: str | None = None
+    final_pdf_url: str | None = None
+    signed_at: datetime | None = None
     created_at: datetime
-    customer_name: Optional[str] = None
-    signatures: List[ContractSignatureOut] = []
+    customer_name: str | None = None
+    signatures: list[ContractSignatureOut] = []
     # 统计字段（由service层计算）
-    invoiced_amount: Optional[Decimal] = None
-    received_amount: Optional[Decimal] = None
-    service_type_id: Optional[int] = None
-    service_type_name: Optional[str] = None
-    service_type_code: Optional[str] = None
+    invoiced_amount: Decimal | None = None
+    received_amount: Decimal | None = None
+    service_type_id: int | None = None
+    service_type_name: str | None = None
+    service_type_code: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -144,21 +144,21 @@ class ContractListOut(BaseModel):
     contract_no: str
     title: str
     customer_id: int
-    customer_name: Optional[str] = None
+    customer_name: str | None = None
     service_type: int
-    service_type_id: Optional[int] = None
-    service_type_name: Optional[str] = None
-    service_type_code: Optional[str] = None
+    service_type_id: int | None = None
+    service_type_name: str | None = None
+    service_type_code: str | None = None
     total_amount: Decimal
     payment_plan: PaymentPlan
     status: ContractStatus
-    sign_date: Optional[date] = None
-    start_date: Optional[date] = None
-    end_date: Optional[date] = None
-    template_id: Optional[int] = None
-    standard_doc_url: Optional[str] = None
-    draft_doc_url: Optional[str] = None
-    final_pdf_url: Optional[str] = None
+    sign_date: date | None = None
+    start_date: date | None = None
+    end_date: date | None = None
+    template_id: int | None = None
+    standard_doc_url: str | None = None
+    draft_doc_url: str | None = None
+    final_pdf_url: str | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}

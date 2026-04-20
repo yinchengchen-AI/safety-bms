@@ -1,13 +1,12 @@
+import logging
 import subprocess
 import tempfile
 import uuid
 from pathlib import Path
 
-from docxtpl import DocxTemplate
 from docx import Document
 from docx.shared import Inches
-
-import logging
+from docxtpl import DocxTemplate
 
 from app.models.contract import ContractTemplate
 from app.services.minio_service import minio_service
@@ -19,7 +18,9 @@ def _download_minio_file(object_name: str) -> bytes:
     return response.read()
 
 
-def _upload_bytes_to_minio(data: bytes, object_name: str, content_type: str = "application/octet-stream") -> str:
+def _upload_bytes_to_minio(
+    data: bytes, object_name: str, content_type: str = "application/octet-stream"
+) -> str:
     """上传 bytes 到 MinIO，返回 object_name"""
     from io import BytesIO
 
@@ -53,7 +54,9 @@ def render_contract_draft(contract, template_object_name: str) -> str:
             "customer_name": customer.name if customer else "",
             "service_type_label": _get_service_type_label(contract),
             "total_amount": str(contract.total_amount) if contract.total_amount else "0.00",
-            "payment_plan_label": _get_payment_plan_label(contract.payment_plan.value if contract.payment_plan else "once"),
+            "payment_plan_label": _get_payment_plan_label(
+                contract.payment_plan.value if contract.payment_plan else "once"
+            ),
             "start_date": contract.start_date.isoformat() if contract.start_date else "",
             "end_date": contract.end_date.isoformat() if contract.end_date else "",
             "sign_date": contract.sign_date.isoformat() if contract.sign_date else "",
@@ -88,7 +91,11 @@ def render_contract_draft(contract, template_object_name: str) -> str:
 
     # 上传到 MinIO
     draft_object_name = f"contracts/{contract.id}/drafts/{uuid.uuid4().hex}.docx"
-    _upload_bytes_to_minio(draft_bytes, draft_object_name, content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+    _upload_bytes_to_minio(
+        draft_bytes,
+        draft_object_name,
+        content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    )
     return draft_object_name
 
 
@@ -122,7 +129,9 @@ def insert_signatures_and_to_pdf(
 
         # 打开文档，插入签名
         doc = Document(str(draft_path))
-        _insert_signature_placeholders(doc, party_a_name, str(sig_a_path), party_b_name, str(sig_b_path))
+        _insert_signature_placeholders(
+            doc, party_a_name, str(sig_a_path), party_b_name, str(sig_b_path)
+        )
 
         signed_docx_path = tmpdir_path / "signed.docx"
         doc.save(str(signed_docx_path))
@@ -136,7 +145,9 @@ def insert_signatures_and_to_pdf(
     return pdf_object_name
 
 
-def _insert_signature_placeholders(doc: Document, party_a_name: str, sig_a_path: str, party_b_name: str, sig_b_path: str):
+def _insert_signature_placeholders(
+    doc: Document, party_a_name: str, sig_a_path: str, party_b_name: str, sig_b_path: str
+):
     """
     在文档末尾添加签名区域。如果文档中已有特定占位文本，则替换为签名图片。
     """
@@ -252,7 +263,7 @@ def _get_payment_plan_label(value: str) -> str:
 
 
 def number_to_chinese_upper(amount) -> str:
-    from decimal import Decimal, ROUND_HALF_UP
+    from decimal import ROUND_HALF_UP, Decimal
 
     amount = Decimal(str(amount)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     integer_part = int(amount)

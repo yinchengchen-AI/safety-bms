@@ -1,16 +1,15 @@
-from typing import Optional
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from app.db.session import get_db
-from app.schemas.role import RoleCreate, RoleUpdate, RoleOut
-from app.schemas.common import PageResponse, ResponseMsg
-from app.crud.role import crud_role
-from app.dependencies import require_permissions
-from app.core.exceptions import NotFoundError, DuplicateError, BusinessError
-from app.models.user import User, Role
-from app.utils.pagination import make_page_response
 from app.core.constants import PermissionCode
+from app.core.exceptions import BusinessError, DuplicateError, NotFoundError
+from app.crud.role import crud_role
+from app.db.session import get_db
+from app.dependencies import require_permissions
+from app.models.user import Role, User
+from app.schemas.common import PageResponse, ResponseMsg
+from app.schemas.role import RoleCreate, RoleOut, RoleUpdate
+from app.utils.pagination import make_page_response
 
 router = APIRouter(prefix="/roles", tags=["角色管理"])
 
@@ -19,7 +18,7 @@ router = APIRouter(prefix="/roles", tags=["角色管理"])
 def list_roles(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=200),
-    keyword: Optional[str] = None,
+    keyword: str | None = None,
     _: User = Depends(require_permissions(PermissionCode.ROLE_READ)),
     db: Session = Depends(get_db),
 ):
@@ -70,9 +69,12 @@ def update_role(
     role = crud_role.get(db, id=role_id)
     if not role:
         raise NotFoundError("角色")
-    if body.name is not None and body.name != role.name:
-        if crud_role.get_by_name(db, name=body.name):
-            raise DuplicateError("角色名")
+    if (
+        body.name is not None
+        and body.name != role.name
+        and crud_role.get_by_name(db, name=body.name)
+    ):
+        raise DuplicateError("角色名")
     return crud_role.update(db, db_obj=role, obj_in=body)
 
 

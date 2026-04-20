@@ -1,10 +1,15 @@
-from typing import List, Optional, Tuple
 from sqlalchemy.orm import Session
 
-from app.crud.base import CRUDBase
-from app.models.service import ServiceOrder, ServiceItem, ServiceReport
-from app.schemas.service import ServiceOrderCreate, ServiceOrderUpdate, ServiceItemCreate, ServiceItemUpdate
 from app.core.constants import ServiceOrderStatus
+from app.core.exceptions import BusinessError
+from app.crud.base import CRUDBase
+from app.models.service import ServiceItem, ServiceOrder, ServiceReport
+from app.schemas.service import (
+    ServiceItemCreate,
+    ServiceItemUpdate,
+    ServiceOrderCreate,
+    ServiceOrderUpdate,
+)
 
 
 class CRUDServiceOrder(CRUDBase[ServiceOrder, ServiceOrderCreate, ServiceOrderUpdate]):
@@ -26,10 +31,10 @@ class CRUDServiceOrder(CRUDBase[ServiceOrder, ServiceOrderCreate, ServiceOrderUp
         *,
         skip: int = 0,
         limit: int = 20,
-        contract_id: Optional[int] = None,
-        assignee_id: Optional[int] = None,
-        status: Optional[ServiceOrderStatus] = None,
-    ) -> Tuple[int, List[ServiceOrder]]:
+        contract_id: int | None = None,
+        assignee_id: int | None = None,
+        status: ServiceOrderStatus | None = None,
+    ) -> tuple[int, list[ServiceOrder]]:
         query = db.query(ServiceOrder)
         if contract_id:
             query = query.filter(ServiceOrder.contract_id == contract_id)
@@ -45,17 +50,28 @@ class CRUDServiceOrder(CRUDBase[ServiceOrder, ServiceOrderCreate, ServiceOrderUp
         self, db: Session, *, db_obj: ServiceOrder, new_status: ServiceOrderStatus
     ) -> ServiceOrder:
         from datetime import date
+
         db_obj.status = new_status
         if new_status == ServiceOrderStatus.IN_PROGRESS and not db_obj.actual_start:
             db_obj.actual_start = date.today()
-        if new_status in (ServiceOrderStatus.COMPLETED, ServiceOrderStatus.ACCEPTED) and not db_obj.actual_end:
+        if (
+            new_status in (ServiceOrderStatus.COMPLETED, ServiceOrderStatus.ACCEPTED)
+            and not db_obj.actual_end
+        ):
             db_obj.actual_end = date.today()
         db.commit()
         db.refresh(db_obj)
         return db_obj
 
     def add_report(
-        self, db: Session, *, order_id: int, uploaded_by: int, file_name: str, file_url: str, file_size: int = 0
+        self,
+        db: Session,
+        *,
+        order_id: int,
+        uploaded_by: int,
+        file_name: str,
+        file_url: str,
+        file_size: int = 0,
     ) -> ServiceReport:
         report = ServiceReport(
             order_id=order_id,
@@ -69,9 +85,7 @@ class CRUDServiceOrder(CRUDBase[ServiceOrder, ServiceOrderCreate, ServiceOrderUp
         db.refresh(report)
         return report
 
-    def create_item(
-        self, db: Session, *, order_id: int, obj_in: ServiceItemCreate
-    ) -> ServiceItem:
+    def create_item(self, db: Session, *, order_id: int, obj_in: ServiceItemCreate) -> ServiceItem:
         item = ServiceItem(**obj_in.model_dump(), order_id=order_id)
         db.add(item)
         db.commit()
@@ -89,21 +103,21 @@ class CRUDServiceOrder(CRUDBase[ServiceOrder, ServiceOrderCreate, ServiceOrderUp
         db.refresh(db_obj)
         return db_obj
 
-    def delete_item(self, db: Session, *, item_id: int) -> Optional[ServiceItem]:
+    def delete_item(self, db: Session, *, item_id: int) -> ServiceItem | None:
         item = db.query(ServiceItem).filter(ServiceItem.id == item_id).first()
         if item:
             db.delete(item)
             db.commit()
         return item
 
-    def delete_report(self, db: Session, *, report_id: int) -> Optional[ServiceReport]:
+    def delete_report(self, db: Session, *, report_id: int) -> ServiceReport | None:
         report = db.query(ServiceReport).filter(ServiceReport.id == report_id).first()
         if report:
             db.delete(report)
             db.commit()
         return report
 
-    def remove(self, db: Session, *, id: int) -> Optional[ServiceOrder]:
+    def remove(self, db: Session, *, id: int) -> ServiceOrder | None:
         obj = db.query(ServiceOrder).filter(ServiceOrder.id == id).first()
         if not obj:
             return None

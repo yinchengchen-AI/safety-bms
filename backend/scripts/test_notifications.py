@@ -2,9 +2,11 @@
 """
 通知场景验证测试脚本
 """
-import requests
-from datetime import date, timedelta
+
 import uuid
+from datetime import date, timedelta
+
+import requests
 
 BASE_URL = "http://localhost:8000/api/v1"
 ADMIN_USER = {"username": "admin", "password": "Admin@123456"}
@@ -52,7 +54,10 @@ def create_contract(customer_id: int, total_amount: float = 10000, end_date=None
 
 def activate_contract(contract_id: int):
     """通过数据库直接设置合同为 active，避免模板依赖"""
-    import psycopg2, os
+    import os
+
+    import psycopg2
+
     conn = psycopg2.connect(
         host=os.getenv("DB_HOST", "localhost"),
         port=os.getenv("DB_PORT", "5432"),
@@ -135,7 +140,9 @@ def test_invoice_sent_notification():
     assert r.status_code == 200, f"更新发票状态失败: {r.text}"
     after = get_notifications()
 
-    assert len(after) > len(before), f"发票 sent 后未收到通知, before={len(before)}, after={len(after)}"
+    assert len(after) > len(
+        before
+    ), f"发票 sent 后未收到通知, before={len(before)}, after={len(after)}"
     before_ids = {n["id"] for n in before}
     new_titles = [n["title"] for n in after if n["id"] not in before_ids]
     assert "发票已寄出" in new_titles, f"未找到'发票已寄出'通知, 新增: {new_titles}"
@@ -183,7 +190,9 @@ def test_contract_terminated_notification():
 
 def test_cli_notification_tasks():
     """验证 CLI 脚本可正常执行不报错（依赖数据库中有对应数据）"""
-    import subprocess, sys
+    import subprocess
+    import sys
+
     result = subprocess.run(
         [sys.executable, "app/cli/notification_tasks.py"],
         capture_output=True,

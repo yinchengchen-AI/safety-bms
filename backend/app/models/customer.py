@@ -1,8 +1,9 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Text, Enum as SAEnum
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import relationship
 
-from app.db.base import Base, TimestampMixin, SoftDeleteMixin
 from app.core.constants import CustomerStatus
+from app.db.base import Base, SoftDeleteMixin, TimestampMixin
 
 
 class Customer(Base, TimestampMixin, SoftDeleteMixin):
@@ -29,8 +30,12 @@ class Customer(Base, TimestampMixin, SoftDeleteMixin):
     remark = Column(Text)
     created_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
-    contacts = relationship("CustomerContact", back_populates="customer", cascade="all, delete-orphan")
-    follow_ups = relationship("CustomerFollowUp", back_populates="customer", cascade="all, delete-orphan")
+    contacts = relationship(
+        "CustomerContact", back_populates="customer", cascade="all, delete-orphan"
+    )
+    follow_ups = relationship(
+        "CustomerFollowUp", back_populates="customer", cascade="all, delete-orphan"
+    )
     contracts = relationship("Contract", back_populates="customer")
 
 

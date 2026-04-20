@@ -1,15 +1,14 @@
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 from hashlib import sha256
-from sqlalchemy.orm import Session
-from jose import JWTError
 
-from app.core.security import create_access_token, create_refresh_token, decode_token
-from app.core.exceptions import BusinessError
-from app.crud.user import crud_user
-from app.models.user import User
-from app.utils.redis_client import get_redis_client
+from jose import JWTError
+from sqlalchemy.orm import Session
+
 from app.config import settings
+from app.core.exceptions import BusinessError
+from app.core.security import create_access_token, create_refresh_token, decode_token
+from app.crud.user import crud_user
+from app.utils.redis_client import get_redis_client
 
 TOKEN_BLACKLIST_PREFIX = "token:blacklist:"
 REFRESH_TOKEN_PREFIX = "token:refresh:"
@@ -42,7 +41,7 @@ class AuthService:
         )
 
         # 更新最后登录时间
-        user.last_login_at = datetime.now(timezone.utc)
+        user.last_login_at = datetime.now(UTC)
         db.commit()
 
         return {
@@ -56,7 +55,7 @@ class AuthService:
         try:
             payload = decode_token(token)
             exp = payload.get("exp", 0)
-            ttl = max(0, int(exp - datetime.now(timezone.utc).timestamp()))
+            ttl = max(0, int(exp - datetime.now(UTC).timestamp()))
             if ttl > 0:
                 get_redis_client().setex(_token_blacklist_key(token), ttl, "1")
         except JWTError:
@@ -72,7 +71,7 @@ class AuthService:
                 raise BusinessError("无效的刷新Token", status_code=401)
             user_id = int(payload["sub"])
         except JWTError:
-            raise BusinessError("无效的刷新Token", status_code=401)
+            raise BusinessError("无效的刷新Token", status_code=401) from None
 
         cached = get_redis_client().get(f"{REFRESH_TOKEN_PREFIX}{user_id}")
         if not cached or cached.decode() != refresh_token:

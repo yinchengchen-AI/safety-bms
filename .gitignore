@@ -1,6 +1,7 @@
 .worktrees/
 .omc/
-
+.playwright-mcp/
+.remember/
 
 # Environment variables
 .env

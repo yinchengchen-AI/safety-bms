@@ -1,17 +1,17 @@
-from typing import List, Optional
-from pydantic import BaseModel
-from datetime import datetime, date
+from datetime import date, datetime
 from decimal import Decimal
+
+from pydantic import BaseModel
 
 from app.core.constants import ServiceOrderStatus
 
 
 class ServiceItemBase(BaseModel):
     name: str
-    description: Optional[str] = None
+    description: str | None = None
     quantity: Decimal = Decimal("1")
     unit: str = "次"
-    remark: Optional[str] = None
+    remark: str | None = None
 
 
 class ServiceItemCreate(ServiceItemBase):
@@ -19,11 +19,11 @@ class ServiceItemCreate(ServiceItemBase):
 
 
 class ServiceItemUpdate(BaseModel):
-    name: Optional[str] = None
-    description: Optional[str] = None
-    quantity: Optional[Decimal] = None
-    unit: Optional[str] = None
-    remark: Optional[str] = None
+    name: str | None = None
+    description: str | None = None
+    quantity: Decimal | None = None
+    unit: str | None = None
+    remark: str | None = None
 
 
 class ServiceItemOut(ServiceItemBase):
@@ -38,8 +38,8 @@ class ServiceReportOut(BaseModel):
     order_id: int
     file_name: str
     file_url: str
-    file_size: Optional[int] = None
-    remark: Optional[str] = None
+    file_size: int | None = None
+    remark: str | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -50,24 +50,24 @@ class ServiceOrderBase(BaseModel):
     contract_id: int
     title: str
     service_type: int
-    assignee_id: Optional[int] = None
-    planned_start: Optional[date] = None
-    planned_end: Optional[date] = None
-    remark: Optional[str] = None
+    assignee_id: int | None = None
+    planned_start: date | None = None
+    planned_end: date | None = None
+    remark: str | None = None
 
 
 class ServiceOrderCreate(ServiceOrderBase):
-    items: List[ServiceItemCreate] = []
+    items: list[ServiceItemCreate] = []
 
 
 class ServiceOrderUpdate(BaseModel):
-    title: Optional[str] = None
-    assignee_id: Optional[int] = None
-    planned_start: Optional[date] = None
-    planned_end: Optional[date] = None
-    actual_start: Optional[date] = None
-    actual_end: Optional[date] = None
-    remark: Optional[str] = None
+    title: str | None = None
+    assignee_id: int | None = None
+    planned_start: date | None = None
+    planned_end: date | None = None
+    actual_start: date | None = None
+    actual_end: date | None = None
+    remark: str | None = None
 
 
 class ServiceOrderStatusUpdate(BaseModel):
@@ -77,16 +77,16 @@ class ServiceOrderStatusUpdate(BaseModel):
 class ServiceOrderOut(ServiceOrderBase):
     id: int
     status: ServiceOrderStatus
-    actual_start: Optional[date] = None
-    actual_end: Optional[date] = None
+    actual_start: date | None = None
+    actual_end: date | None = None
     created_at: datetime
-    customer_name: Optional[str] = None
-    assignee_name: Optional[str] = None
-    items: List[ServiceItemOut] = []
-    reports: List[ServiceReportOut] = []
+    customer_name: str | None = None
+    assignee_name: str | None = None
+    items: list[ServiceItemOut] = []
+    reports: list[ServiceReportOut] = []
     service_type_id: int
-    service_type_name: Optional[str] = None
-    service_type_code: Optional[str] = None
+    service_type_name: str | None = None
+    service_type_code: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -96,16 +96,16 @@ class ServiceOrderListOut(BaseModel):
     order_no: str
     title: str
     contract_id: int
-    customer_name: Optional[str] = None
+    customer_name: str | None = None
     service_type: int
     service_type_id: int
-    service_type_name: Optional[str] = None
-    service_type_code: Optional[str] = None
+    service_type_name: str | None = None
+    service_type_code: str | None = None
     status: ServiceOrderStatus
-    assignee_id: Optional[int] = None
-    assignee_name: Optional[str] = None
-    planned_start: Optional[date] = None
-    planned_end: Optional[date] = None
+    assignee_id: int | None = None
+    assignee_name: str | None = None
+    planned_start: date | None = None
+    planned_end: date | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}

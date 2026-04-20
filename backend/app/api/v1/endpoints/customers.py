@@ -1,24 +1,28 @@
-from typing import Optional
-from fastapi import APIRouter, Depends, Query, UploadFile, File
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from app.db.session import get_db
-from app.schemas.customer import (
-    CustomerCreate, CustomerUpdate, CustomerOut, CustomerListOut,
-    CustomerContactCreate, CustomerContactOut, CustomerFollowUpCreate, CustomerFollowUpOut,
-)
-from app.schemas.common import PageResponse, ResponseMsg
-from app.crud.customer import crud_customer
-from app.dependencies import require_permissions
-from app.core.exceptions import NotFoundError, PermissionDeniedError, BusinessError
 from app.core.constants import CustomerStatus, PermissionCode
-from app.utils.data_scope import apply_data_scope, check_data_scope
+from app.core.exceptions import BusinessError, NotFoundError, PermissionDeniedError
+from app.crud.customer import crud_customer
+from app.db.session import get_db
+from app.dependencies import require_permissions
 from app.models.customer import Customer
 from app.models.user import User
-from app.services.minio_service import minio_service
-from app.utils.pagination import make_page_response
+from app.schemas.common import PageResponse, ResponseMsg
+from app.schemas.customer import (
+    CustomerContactCreate,
+    CustomerContactOut,
+    CustomerCreate,
+    CustomerFollowUpCreate,
+    CustomerFollowUpOut,
+    CustomerListOut,
+    CustomerOut,
+    CustomerUpdate,
+)
+from app.utils.data_scope import apply_data_scope, check_data_scope
 from app.utils.excel_export import export_excel_response
 from app.utils.export_mappings import CUSTOMER_STATUS_MAP, map_value
+from app.utils.pagination import make_page_response
 
 router = APIRouter(prefix="/customers", tags=["客户管理"])
 
@@ -27,8 +31,8 @@ router = APIRouter(prefix="/customers", tags=["客户管理"])
 def list_customers(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=200),
-    status: Optional[CustomerStatus] = None,
-    keyword: Optional[str] = None,
+    status: CustomerStatus | None = None,
+    keyword: str | None = None,
     current_user: User = Depends(require_permissions(PermissionCode.CUSTOMER_READ)),
     db: Session = Depends(get_db),
 ):
@@ -46,8 +50,8 @@ def list_customers(
 
 @router.get("/export")
 def export_customers(
-    status: Optional[CustomerStatus] = None,
-    keyword: Optional[str] = None,
+    status: CustomerStatus | None = None,
+    keyword: str | None = None,
     current_user: User = Depends(require_permissions(PermissionCode.CUSTOMER_READ)),
     db: Session = Depends(get_db),
 ):
@@ -58,16 +62,37 @@ def export_customers(
         query = query.filter(Customer.name.ilike(f"%{keyword}%"))
     query = apply_data_scope(query, Customer, current_user)
     items = query.order_by(Customer.created_at.desc()).all()
-    headers = ["客户名称", "统一信用代码", "行业", "规模", "地址", "联系人", "联系电话", "状态", "创建时间"]
+    headers = [
+        "客户名称",
+        "统一信用代码",
+        "行业",
+        "规模",
+        "地址",
+        "联系人",
+        "联系电话",
+        "状态",
+        "创建时间",
+    ]
     rows = []
     for c in items:
-        rows.append([
-            c.name, c.credit_code or "", c.industry or "", c.scale or "", c.address or "",
-            c.contact_name or "", c.contact_phone or "", map_value(c.status.value if c.status else "", CUSTOMER_STATUS_MAP),
-            c.created_at.strftime("%Y-%m-%d %H:%M") if c.created_at else "",
-        ])
+        rows.append(
+            [
+                c.name,
+                c.credit_code or "",
+                c.industry or "",
+                c.scale or "",
+                c.address or "",
+                c.contact_name or "",
+                c.contact_phone or "",
+                map_value(c.status.value if c.status else "", CUSTOMER_STATUS_MAP),
+                c.created_at.strftime("%Y-%m-%d %H:%M") if c.created_at else "",
+            ]
+        )
     from datetime import datetime
-    return export_excel_response(f"customers_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx", headers, rows)
+
+    return export_excel_response(
+        f"customers_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx", headers, rows
+    )
 
 
 @router.post("", response_model=CustomerOut, status_code=201)
@@ -150,7 +175,9 @@ def add_follow_up(
         raise NotFoundError("客户")
     if not check_data_scope(customer, current_user):
         raise PermissionDeniedError()
-    return crud_customer.add_follow_up(db, customer_id=customer_id, creator_id=current_user.id, obj_in=body)
+    return crud_customer.add_follow_up(
+        db, customer_id=customer_id, creator_id=current_user.id, obj_in=body
+    )
 
 
 @router.get("/{customer_id}/follow-ups", response_model=list[CustomerFollowUpOut])

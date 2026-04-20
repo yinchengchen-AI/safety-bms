@@ -1,30 +1,29 @@
-from typing import Optional
-from fastapi import APIRouter, Depends, Query, UploadFile, File
+from fastapi import APIRouter, Depends, File, Query, UploadFile
 from sqlalchemy.orm import Session, joinedload
 
-from app.db.session import get_db
-from app.schemas.invoice import (
-    InvoiceCreate,
-    InvoiceUpdate,
-    InvoiceOut,
-    InvoiceListOut,
-    InvoiceAuditRequest,
-)
-from app.schemas.common import PageResponse, ResponseMsg, FileUploadResponse
-from app.crud.invoice import crud_invoice
-from app.dependencies import require_permissions
-from app.core.exceptions import NotFoundError, PermissionDeniedError, BusinessError
 from app.core.constants import InvoiceStatus, PermissionCode
-from app.models.invoice import Invoice
+from app.core.exceptions import BusinessError, NotFoundError, PermissionDeniedError
+from app.crud.invoice import crud_invoice
+from app.db.session import get_db
+from app.dependencies import require_permissions
 from app.models.contract import Contract
+from app.models.invoice import Invoice
 from app.models.user import User
+from app.schemas.common import FileUploadResponse, PageResponse
+from app.schemas.invoice import (
+    InvoiceAuditRequest,
+    InvoiceCreate,
+    InvoiceListOut,
+    InvoiceOut,
+    InvoiceUpdate,
+)
 from app.services.invoice_service import invoice_service
 from app.services.minio_service import minio_service
 from app.services.notification_service import notification_service
 from app.utils.data_scope import apply_data_scope, check_data_scope
-from app.utils.pagination import make_page_response
 from app.utils.excel_export import export_excel_response
 from app.utils.export_mappings import INVOICE_STATUS_MAP, INVOICE_TYPE_MAP, map_value
+from app.utils.pagination import make_page_response
 
 router = APIRouter(prefix="/invoices", tags=["开票管理"])
 
@@ -33,9 +32,9 @@ router = APIRouter(prefix="/invoices", tags=["开票管理"])
 def list_invoices(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=200),
-    contract_id: Optional[int] = None,
-    customer_id: Optional[int] = None,
-    status: Optional[InvoiceStatus] = None,
+    contract_id: int | None = None,
+    customer_id: int | None = None,
+    status: InvoiceStatus | None = None,
     current_user: User = Depends(require_permissions(PermissionCode.INVOICE_READ)),
     db: Session = Depends(get_db),
 ):
@@ -62,9 +61,7 @@ def list_invoices(
     for item in items:
         out = InvoiceListOut.model_validate(item)
         out.customer_name = (
-            item.contract.customer.name
-            if item.contract and item.contract.customer
-            else None
+            item.contract.customer.name if item.contract and item.contract.customer else None
         )
         result.append(out)
     return make_page_response(total, result, page, page_size)
@@ -72,9 +69,9 @@ def list_invoices(
 
 @router.get("/export")
 def export_invoices(
-    contract_id: Optional[int] = None,
-    customer_id: Optional[int] = None,
-    status: Optional[InvoiceStatus] = None,
+    contract_id: int | None = None,
+    customer_id: int | None = None,
+    status: InvoiceStatus | None = None,
     current_user: User = Depends(require_permissions(PermissionCode.INVOICE_READ)),
     db: Session = Depends(get_db),
 ):
@@ -110,9 +107,7 @@ def export_invoices(
             [
                 item.invoice_no,
                 map_value(item.invoice_type.value if item.invoice_type else "", INVOICE_TYPE_MAP),
-                item.contract.customer.name
-                if item.contract and item.contract.customer
-                else "",
+                item.contract.customer.name if item.contract and item.contract.customer else "",
                 item.contract.contract_no if item.contract else "",
                 str(item.amount) if item.amount is not None else "",
                 str(item.tax_rate) if item.tax_rate is not None else "",
@@ -134,9 +129,7 @@ def create_invoice(
     current_user: User = Depends(require_permissions(PermissionCode.INVOICE_CREATE)),
     db: Session = Depends(get_db),
 ):
-    return invoice_service.create_invoice(
-        db, obj_in=body, applied_by=int(getattr(current_user, "id"))
-    )
+    return invoice_service.create_invoice(db, obj_in=body, applied_by=int(current_user.id))
 
 
 @router.get("/{invoice_id}", response_model=InvoiceOut)
@@ -172,26 +165,16 @@ def update_invoice(
         and body.status != old_status
         and getattr(updated, "applied_by", None) is not None
     ):
-        applied_by = int(getattr(updated, "applied_by"))
+        applied_by = int(updated.applied_by)
         contract_title = updated.contract.title if updated.contract else ""
         contract_no = updated.contract.contract_no if updated.contract else ""
         customer_name = (
-            updated.contract.customer.name
-            if updated.contract and updated.contract.customer
-            else ""
+            updated.contract.customer.name if updated.contract and updated.contract.customer else ""
         )
-        amount_str = (
-            format(updated.amount, ".2f") if updated.amount is not None else "0.00"
-        )
-        tax_str = (
-            format(updated.tax_amount, ".2f")
-            if updated.tax_amount is not None
-            else "0.00"
-        )
+        amount_str = format(updated.amount, ".2f") if updated.amount is not None else "0.00"
+        tax_str = format(updated.tax_amount, ".2f") if updated.tax_amount is not None else "0.00"
         invoice_date_value = getattr(updated, "invoice_date", None)
-        invoice_date = (
-            invoice_date_value.isoformat() if invoice_date_value else "未填写"
-        )
+        invoice_date = invoice_date_value.isoformat() if invoice_date_value else "未填写"
         customer_line = f"客户：{customer_name}\n" if customer_name else ""
         if body.status == InvoiceStatus.ISSUED:
             notification_service.create(
@@ -235,18 +218,14 @@ def audit_invoice(
     updated = invoice_service.audit_invoice(db, invoice_id=invoice_id, body=body)
 
     applied_by = getattr(updated, "applied_by", None)
-    current_user_id = int(getattr(current_user, "id"))
+    current_user_id = int(current_user.id)
     if applied_by is not None and int(applied_by) != current_user_id:
         contract_title = updated.contract.title if updated.contract else ""
         contract_no = updated.contract.contract_no if updated.contract else ""
         customer_name = (
-            updated.contract.customer.name
-            if updated.contract and updated.contract.customer
-            else ""
+            updated.contract.customer.name if updated.contract and updated.contract.customer else ""
         )
-        amount_str = (
-            format(updated.amount, ".2f") if updated.amount is not None else "0.00"
-        )
+        amount_str = format(updated.amount, ".2f") if updated.amount is not None else "0.00"
         customer_line = f"客户：{customer_name}\n" if customer_name else ""
 
         if body.action == "approve":

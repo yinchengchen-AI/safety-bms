@@ -1,18 +1,18 @@
 from app.api.v1.endpoints import (
     analytics,
     auth,
-    users,
-    roles,
-    departments,
-    customers,
-    contracts,
-    services,
-    invoices,
-    payments,
-    dashboard,
     contract_templates,
+    contracts,
+    customers,
+    dashboard,
+    departments,
+    invoices,
     notifications,
+    payments,
     permissions,
+    roles,
+    services,
+    users,
 )
 
 __all__ = [

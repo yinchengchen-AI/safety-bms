@@ -1,25 +1,25 @@
 from datetime import date
-from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
-from sqlalchemy import func, extract
 
-from app.db.session import get_db
-from app.dependencies import get_current_user, require_permissions
-from app.models.user import User
-from app.models.customer import Customer
-from app.models.contract import Contract
-from app.models.service import ServiceOrder
-from app.models.invoice import Invoice
-from app.models.payment import Payment
+from fastapi import APIRouter, Depends
+from sqlalchemy import extract, func
+from sqlalchemy.orm import Session
+
 from app.core.constants import (
     ContractStatus,
-    ServiceOrderStatus,
     InvoiceStatus,
     PermissionCode,
 )
+from app.crud.payment import crud_payment
+from app.db.session import get_db
+from app.dependencies import require_permissions
+from app.models.contract import Contract
+from app.models.customer import Customer
+from app.models.invoice import Invoice
+from app.models.payment import Payment
+from app.models.service import ServiceOrder
+from app.models.user import User
 from app.utils.data_scope import apply_data_scope
 from app.utils.enum_format import enum_value
-from app.crud.payment import crud_payment
 
 router = APIRouter(prefix="/dashboard", tags=["仪表盘"])
 
@@ -30,9 +30,7 @@ def _invoice_metric_date_expr():
 
 @router.get("/stats")
 def get_stats(
-    current_user: User = Depends(
-        require_permissions(PermissionCode.DASHBOARD_READ.value)
-    ),
+    current_user: User = Depends(require_permissions(PermissionCode.DASHBOARD_READ.value)),
     db: Session = Depends(get_db),
 ):
     today = date.today()
@@ -74,12 +72,10 @@ def get_stats(
     monthly_payment_amount = payment_query.scalar()
 
     # 总应收余额
-    total_contract_query = db.query(
-        func.coalesce(func.sum(Contract.total_amount), 0)
-    ).filter(Contract.is_deleted == False, Contract.status == ContractStatus.ACTIVE)
-    total_contract_query = apply_data_scope(
-        total_contract_query, Contract, current_user
+    total_contract_query = db.query(func.coalesce(func.sum(Contract.total_amount), 0)).filter(
+        Contract.is_deleted == False, Contract.status == ContractStatus.ACTIVE
     )
+    total_contract_query = apply_data_scope(total_contract_query, Contract, current_user)
     total_contract_amount = total_contract_query.scalar()
 
     total_received_query = db.query(func.coalesce(func.sum(Payment.amount), 0))
@@ -99,13 +95,10 @@ def get_stats(
         .group_by(extract("month", invoice_metric_date))
         .order_by(extract("month", invoice_metric_date))
     )
-    monthly_invoice_query = apply_data_scope(
-        monthly_invoice_query, Invoice, current_user
-    )
+    monthly_invoice_query = apply_data_scope(monthly_invoice_query, Invoice, current_user)
     monthly_invoice_results = monthly_invoice_query.all()
     monthly_invoices = [
-        {"month": int(r.month), "total": float(r.total or 0)}
-        for r in monthly_invoice_results
+        {"month": int(r.month), "total": float(r.total or 0)} for r in monthly_invoice_results
     ]
 
     # 月度收款趋势（带 data_scope 过滤）
@@ -118,13 +111,10 @@ def get_stats(
         .group_by(extract("month", Payment.payment_date))
         .order_by(extract("month", Payment.payment_date))
     )
-    monthly_payment_query = apply_data_scope(
-        monthly_payment_query, Payment, current_user
-    )
+    monthly_payment_query = apply_data_scope(monthly_payment_query, Payment, current_user)
     monthly_payment_results = monthly_payment_query.all()
     monthly_payments = [
-        {"month": int(r.month), "total": float(r.total or 0)}
-        for r in monthly_payment_results
+        {"month": int(r.month), "total": float(r.total or 0)} for r in monthly_payment_results
     ]
 
     # 逾期合同数及列表
@@ -138,9 +128,7 @@ def get_stats(
 
     contract_ids = [c.id for c in overdue_contracts_db]
     payment_sums = (
-        crud_payment.get_sums_by_contract_ids(db, contract_ids=contract_ids)
-        if contract_ids
-        else {}
+        crud_payment.get_sums_by_contract_ids(db, contract_ids=contract_ids) if contract_ids else {}
     )
 
     overdue_contracts = []
@@ -174,9 +162,7 @@ def get_stats(
         .group_by(extract("month", Customer.created_at))
         .order_by(extract("month", Customer.created_at))
     )
-    customer_growth_query = apply_data_scope(
-        customer_growth_query, Customer, current_user
-    )
+    customer_growth_query = apply_data_scope(customer_growth_query, Customer, current_user)
     customer_growth_results = customer_growth_query.all()
     customer_growth_trend = [
         {"month": int(r.month), "count": int(r.count)} for r in customer_growth_results

@@ -1,9 +1,9 @@
-from app.crud.user import crud_user
-from app.crud.customer import crud_customer
 from app.crud.contract import crud_contract
-from app.crud.service import crud_service
+from app.crud.customer import crud_customer
 from app.crud.invoice import crud_invoice
 from app.crud.payment import crud_payment
+from app.crud.service import crud_service
+from app.crud.user import crud_user
 
 __all__ = [
     "crud_user",

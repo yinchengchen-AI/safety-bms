@@ -1,9 +1,9 @@
 from typing import Any
+
 from sqlalchemy import false
 from sqlalchemy.orm import Query
 
-from app.models.user import User, DataScope
-
+from app.models.user import DataScope, User
 
 _SCOPE_PRIORITY = {
     DataScope.ALL: 3,

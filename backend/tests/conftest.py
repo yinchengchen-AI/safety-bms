@@ -1,5 +1,6 @@
 import pytest
 from fastapi.testclient import TestClient
+
 from app.main import app
 from app.utils.redis_client import get_redis_client
 
@@ -33,6 +34,7 @@ def authenticated_client(client):
 @pytest.fixture
 def db_session():
     from app.db.session import SessionLocal
+
     db = SessionLocal()
     try:
         yield db

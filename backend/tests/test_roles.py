@@ -1,12 +1,12 @@
 import pytest
 from fastapi.testclient import TestClient
-from app.main import app
-from app.db.session import SessionLocal
-from app.db.base_all import Base  # noqa: F401
-from app.models.user import Role, Permission
-from app.core.security import get_password_hash
+
 from app.core.constants import PermissionCode
-from app.crud.role import crud_role, PREDEFINED_ROLES
+from app.crud.role import PREDEFINED_ROLES
+from app.db.base_all import Base  # noqa: F401
+from app.db.session import SessionLocal
+from app.main import app
+from app.models.user import Role
 
 client = TestClient(app)
 
@@ -20,11 +20,17 @@ def _admin_login():
 class TestRoleCrud:
     def test_create_role(self):
         import uuid
+
         role_name = f"test_role_create_{uuid.uuid4().hex[:8]}"
         token = _admin_login()
         r = client.post(
             "/api/v1/roles",
-            json={"name": role_name, "description": "test", "data_scope": "self", "permission_ids": []},
+            json={
+                "name": role_name,
+                "description": "test",
+                "data_scope": "self",
+                "permission_ids": [],
+            },
             cookies={"access_token": token},
         )
         assert r.status_code == 201

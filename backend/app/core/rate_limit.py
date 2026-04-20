@@ -1,6 +1,8 @@
 import logging
+
 import redis
-from fastapi import Request, HTTPException
+from fastapi import HTTPException, Request
+
 from app.utils.redis_client import get_redis_client
 
 logger = logging.getLogger(__name__)

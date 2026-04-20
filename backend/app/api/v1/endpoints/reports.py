@@ -1,5 +1,4 @@
 from datetime import date
-from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func
@@ -102,10 +101,10 @@ def list_reports(
 def contract_execution_report(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    date_from: Optional[date] = None,
-    date_to: Optional[date] = None,
-    service_type: Optional[int] = None,
-    status: Optional[str] = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    service_type: int | None = None,
+    status: str | None = None,
     current_user: User = Depends(require_permissions(PermissionCode.REPORT_READ.value)),
     db: Session = Depends(get_db),
 ):
@@ -177,10 +176,10 @@ def contract_execution_report(
 def service_order_completion_report(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    date_from: Optional[date] = None,
-    date_to: Optional[date] = None,
-    service_type: Optional[int] = None,
-    status: Optional[str] = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    service_type: int | None = None,
+    status: str | None = None,
     current_user: User = Depends(require_permissions(PermissionCode.REPORT_READ.value)),
     db: Session = Depends(get_db),
 ):
@@ -196,6 +195,7 @@ def service_order_completion_report(
         .outerjoin(Customer, Contract.customer_id == Customer.id)
         .outerjoin(User, ServiceOrder.assignee_id == User.id)
         .outerjoin(ServiceTypeModel, ServiceOrder.service_type == ServiceTypeModel.id)
+        .filter(Contract.is_deleted == False)
     )
 
     if date_from:
@@ -246,8 +246,8 @@ def service_order_completion_report(
 def customer_payment_analysis_report(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    date_from: Optional[date] = None,
-    date_to: Optional[date] = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
     current_user: User = Depends(require_permissions(PermissionCode.REPORT_READ.value)),
     db: Session = Depends(get_db),
 ):
@@ -311,7 +311,9 @@ def customer_payment_analysis_report(
     for customer, contract_count, total_contract, total_invoiced, total_received in results:
         total_contract_f = _to_float(total_contract)
         total_received_f = _to_float(total_received)
-        collection_rate = round((total_received_f / total_contract_f) * 100, 2) if total_contract_f > 0 else 0.0
+        collection_rate = (
+            round((total_received_f / total_contract_f) * 100, 2) if total_contract_f > 0 else 0.0
+        )
         items.append(
             CustomerPaymentAnalysisRowOut(
                 customer_id=customer.id,
@@ -331,9 +333,9 @@ def customer_payment_analysis_report(
 def invoice_detail_report(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    date_from: Optional[date] = None,
-    date_to: Optional[date] = None,
-    status: Optional[str] = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    status: str | None = None,
     current_user: User = Depends(require_permissions(PermissionCode.REPORT_READ.value)),
     db: Session = Depends(get_db),
 ):
@@ -347,6 +349,7 @@ def invoice_detail_report(
         .join(Contract, Invoice.contract_id == Contract.id)
         .outerjoin(Customer, Contract.customer_id == Customer.id)
         .outerjoin(User, Invoice.applied_by == User.id)
+        .filter(Contract.is_deleted == False)
     )
 
     if date_from:
@@ -389,9 +392,9 @@ def invoice_detail_report(
 def payment_detail_report(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    date_from: Optional[date] = None,
-    date_to: Optional[date] = None,
-    payment_method: Optional[str] = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    payment_method: str | None = None,
     current_user: User = Depends(require_permissions(PermissionCode.REPORT_READ.value)),
     db: Session = Depends(get_db),
 ):
@@ -405,6 +408,7 @@ def payment_detail_report(
         .join(Contract, Payment.contract_id == Contract.id)
         .outerjoin(Customer, Contract.customer_id == Customer.id)
         .outerjoin(User, Payment.created_by == User.id)
+        .filter(Contract.is_deleted == False)
     )
 
     if date_from:
@@ -446,9 +450,9 @@ def payment_detail_report(
 def customer_ledger_summary_report(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    date_from: Optional[date] = None,
-    date_to: Optional[date] = None,
-    status: Optional[str] = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    status: str | None = None,
     current_user: User = Depends(require_permissions(PermissionCode.REPORT_READ.value)),
     db: Session = Depends(get_db),
 ):
@@ -533,11 +537,11 @@ def customer_ledger_summary_report(
 @router.get("/{report_id}/export")
 def export_report(
     report_id: str,
-    date_from: Optional[date] = None,
-    date_to: Optional[date] = None,
-    service_type: Optional[int] = None,
-    status: Optional[str] = None,
-    payment_method: Optional[str] = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    service_type: int | None = None,
+    status: str | None = None,
+    payment_method: str | None = None,
     current_user: User = Depends(require_permissions(PermissionCode.REPORT_READ.value)),
     db: Session = Depends(get_db),
 ):

@@ -2,21 +2,24 @@
 """
 初始化默认合同模板：上传模板文件到 MinIO 并在数据库中创建默认记录。
 """
+
 import sys
-from pathlib import Path
 from io import BytesIO
+from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from sqlalchemy.orm import Session
-from app.db.session import SessionLocal
+
 from app.db.base_all import Base  # noqa: F401
+from app.db.session import SessionLocal
 from app.models.contract import ContractTemplate
 from app.models.service_type import ServiceType
 from app.services.minio_service import minio_service
 
-
-TEMPLATE_PATH = Path(__file__).parent.parent / "templates" / "contracts" / "安全生产社会化服务_template.docx"
+TEMPLATE_PATH = (
+    Path(__file__).parent.parent / "templates" / "contracts" / "安全生产社会化服务_template.docx"
+)
 MINIO_OBJECT_NAME = "contract-templates/default-安全生产社会化服务_template.docx"
 
 
@@ -46,7 +49,9 @@ def seed(db: Session) -> None:
         existing.service_type = service_type.id
         db.commit()
         db.refresh(existing)
-        print(f"✅ 默认模板已更新: {existing.name} (id={existing.id}, service_type={service_type.name})")
+        print(
+            f"✅ 默认模板已更新: {existing.name} (id={existing.id}, service_type={service_type.name})"
+        )
         return
 
     template = ContractTemplate(
@@ -58,7 +63,9 @@ def seed(db: Session) -> None:
     db.add(template)
     db.commit()
     db.refresh(template)
-    print(f"✅ 默认模板已创建: {template.name} (id={template.id}, service_type={service_type.name})")
+    print(
+        f"✅ 默认模板已创建: {template.name} (id={template.id}, service_type={service_type.name})"
+    )
 
 
 def main():

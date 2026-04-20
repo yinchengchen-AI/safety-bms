@@ -1,12 +1,12 @@
-from typing import List, Optional
-from pydantic import BaseModel
 from datetime import datetime
+
+from pydantic import BaseModel
 
 
 class DepartmentBase(BaseModel):
     name: str
-    description: Optional[str] = None
-    parent_id: Optional[int] = None
+    description: str | None = None
+    parent_id: int | None = None
 
 
 class DepartmentCreate(DepartmentBase):
@@ -14,9 +14,9 @@ class DepartmentCreate(DepartmentBase):
 
 
 class DepartmentUpdate(BaseModel):
-    name: Optional[str] = None
-    description: Optional[str] = None
-    parent_id: Optional[int] = None
+    name: str | None = None
+    description: str | None = None
+    parent_id: int | None = None
 
 
 class DepartmentOut(DepartmentBase):
@@ -27,6 +27,6 @@ class DepartmentOut(DepartmentBase):
 
 
 class DepartmentTreeOut(DepartmentOut):
-    children: List["DepartmentTreeOut"] = []
+    children: list["DepartmentTreeOut"] = []
 
     model_config = {"from_attributes": True}

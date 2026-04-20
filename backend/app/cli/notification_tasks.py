@@ -3,16 +3,17 @@
 用法：
     PYTHONPATH=. python app/cli/notification_tasks.py
 """
+
 from datetime import date, timedelta
 
 from sqlalchemy.orm import Session, joinedload
 
-from app.db.session import SessionLocal
-from app.db.base_all import Base  # noqa: F401
 from app.core.constants import ContractStatus
+from app.db.base_all import Base  # noqa: F401
+from app.db.session import SessionLocal
 from app.models.contract import Contract
-from app.services.payment_service import payment_service
 from app.services.notification_service import notification_service
+from app.services.payment_service import payment_service
 
 
 def notify_expiring_contracts(db: Session, days_before: int = 7) -> int:
@@ -32,7 +33,11 @@ def notify_expiring_contracts(db: Session, days_before: int = 7) -> int:
     for contract in contracts:
         receivable = payment_service.get_contract_receivable(db, contract_id=contract.id)
         if receivable.receivable_amount > 0 and contract.created_by is not None:
-            total_str = format(contract.total_amount, ".2f") if contract.total_amount is not None else "0.00"
+            total_str = (
+                format(contract.total_amount, ".2f")
+                if contract.total_amount is not None
+                else "0.00"
+            )
             received_str = format(receivable.received_amount, ".2f")
             receivable_str = format(receivable.receivable_amount, ".2f")
             customer_name = contract.customer.name if contract.customer else ""
@@ -68,7 +73,11 @@ def notify_overdue_contracts(db: Session) -> int:
     for contract in contracts:
         receivable = payment_service.get_contract_receivable(db, contract_id=contract.id)
         if receivable.receivable_amount > 0 and contract.created_by is not None:
-            total_str = format(contract.total_amount, ".2f") if contract.total_amount is not None else "0.00"
+            total_str = (
+                format(contract.total_amount, ".2f")
+                if contract.total_amount is not None
+                else "0.00"
+            )
             received_str = format(receivable.received_amount, ".2f")
             receivable_str = format(receivable.receivable_amount, ".2f")
             customer_name = contract.customer.name if contract.customer else ""

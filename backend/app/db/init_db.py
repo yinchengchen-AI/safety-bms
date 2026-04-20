@@ -1,17 +1,33 @@
 from sqlalchemy.orm import Session
 
-from app.db.session import SessionLocal
-from app.db.base_all import Base  # noqa: F401
+from app.core.constants import DataScope, PermissionCode
+from app.core.constants import UserRole as UserRoleEnum
 from app.core.security import get_password_hash
-from app.core.constants import UserRole as UserRoleEnum, DataScope, PermissionCode
-from app.models.user import User, Role, Permission
-
+from app.db.base_all import Base  # noqa: F401
+from app.db.session import SessionLocal
+from app.models.user import Permission, Role, User
 
 DEFAULT_ROLES = [
-    {"name": UserRoleEnum.ADMIN, "description": "系统管理员，拥有所有权限", "data_scope": DataScope.ALL},
-    {"name": UserRoleEnum.SALES, "description": "销售，管理客户和合同", "data_scope": DataScope.DEPT},
-    {"name": UserRoleEnum.SERVICE, "description": "服务人员，处理服务工单", "data_scope": DataScope.DEPT},
-    {"name": UserRoleEnum.FINANCE, "description": "财务，管理开票和收款", "data_scope": DataScope.DEPT},
+    {
+        "name": UserRoleEnum.ADMIN,
+        "description": "系统管理员，拥有所有权限",
+        "data_scope": DataScope.ALL,
+    },
+    {
+        "name": UserRoleEnum.SALES,
+        "description": "销售，管理客户和合同",
+        "data_scope": DataScope.DEPT,
+    },
+    {
+        "name": UserRoleEnum.SERVICE,
+        "description": "服务人员，处理服务工单",
+        "data_scope": DataScope.DEPT,
+    },
+    {
+        "name": UserRoleEnum.FINANCE,
+        "description": "财务，管理开票和收款",
+        "data_scope": DataScope.DEPT,
+    },
     {"name": UserRoleEnum.VIEWER, "description": "只读查看", "data_scope": DataScope.SELF},
 ]
 
@@ -48,6 +64,7 @@ ROLE_DEFAULT_PERMISSIONS = {
         PermissionCode.CUSTOMER_READ,
         PermissionCode.DASHBOARD_READ,
         PermissionCode.ANALYTICS_READ,
+        PermissionCode.REPORT_READ,
     ],
     UserRoleEnum.FINANCE: [
         PermissionCode.INVOICE_READ,

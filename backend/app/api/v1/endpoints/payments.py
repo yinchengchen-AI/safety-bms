@@ -1,24 +1,29 @@
-from typing import Optional
-from fastapi import APIRouter, Depends, Query, UploadFile, File
+from fastapi import APIRouter, Depends, File, Query, UploadFile
 from sqlalchemy.orm import Session, joinedload
 
-from app.db.session import get_db
-from app.schemas.payment import PaymentCreate, PaymentUpdate, PaymentOut, PaymentListOut, ContractReceivable
-from app.schemas.common import PageResponse, ResponseMsg, FileUploadResponse
-from app.crud.payment import crud_payment
-from app.dependencies import require_permissions
-from app.core.exceptions import NotFoundError, PermissionDeniedError, BusinessError
 from app.core.constants import PermissionCode
-from app.models.payment import Payment
+from app.core.exceptions import BusinessError, NotFoundError, PermissionDeniedError
+from app.crud.payment import crud_payment
+from app.db.session import get_db
+from app.dependencies import require_permissions
 from app.models.contract import Contract
+from app.models.payment import Payment
 from app.models.user import User
-from app.services.payment_service import payment_service
-from app.services.notification_service import notification_service
+from app.schemas.common import FileUploadResponse, PageResponse
+from app.schemas.payment import (
+    ContractReceivable,
+    PaymentCreate,
+    PaymentListOut,
+    PaymentOut,
+    PaymentUpdate,
+)
 from app.services.minio_service import minio_service
+from app.services.notification_service import notification_service
+from app.services.payment_service import payment_service
 from app.utils.data_scope import apply_data_scope, check_data_scope
-from app.utils.pagination import make_page_response
 from app.utils.excel_export import export_excel_response
 from app.utils.export_mappings import PAYMENT_METHOD_MAP, map_value
+from app.utils.pagination import make_page_response
 
 router = APIRouter(prefix="/payments", tags=["收款管理"])
 
@@ -27,9 +32,9 @@ router = APIRouter(prefix="/payments", tags=["收款管理"])
 def list_payments(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=200),
-    contract_id: Optional[int] = None,
-    customer_id: Optional[int] = None,
-    invoice_id: Optional[int] = None,
+    contract_id: int | None = None,
+    customer_id: int | None = None,
+    invoice_id: int | None = None,
     current_user: User = Depends(require_permissions(PermissionCode.PAYMENT_READ)),
     db: Session = Depends(get_db),
 ):
@@ -38,7 +43,9 @@ def list_payments(
     if contract_id:
         query = query.filter(Payment.contract_id == contract_id)
     if customer_id:
-        query = query.join(Contract, Payment.contract_id == Contract.id).filter(Contract.customer_id == customer_id)
+        query = query.join(Contract, Payment.contract_id == Contract.id).filter(
+            Contract.customer_id == customer_id
+        )
     if invoice_id:
         query = query.filter(Payment.invoice_id == invoice_id)
     query = apply_data_scope(query, Payment, current_user)
@@ -54,16 +61,18 @@ def list_payments(
     for item in items:
         out = PaymentListOut.model_validate(item)
         out.contract_no = item.contract.contract_no if item.contract else None
-        out.customer_name = item.contract.customer.name if item.contract and item.contract.customer else None
+        out.customer_name = (
+            item.contract.customer.name if item.contract and item.contract.customer else None
+        )
         result.append(out)
     return make_page_response(total, result, page, page_size)
 
 
 @router.get("/export")
 def export_payments(
-    contract_id: Optional[int] = None,
-    customer_id: Optional[int] = None,
-    invoice_id: Optional[int] = None,
+    contract_id: int | None = None,
+    customer_id: int | None = None,
+    invoice_id: int | None = None,
     current_user: User = Depends(require_permissions(PermissionCode.PAYMENT_READ)),
     db: Session = Depends(get_db),
 ):
@@ -71,23 +80,38 @@ def export_payments(
     if contract_id:
         query = query.filter(Payment.contract_id == contract_id)
     if customer_id:
-        query = query.join(Contract, Payment.contract_id == Contract.id).filter(Contract.customer_id == customer_id)
+        query = query.join(Contract, Payment.contract_id == Contract.id).filter(
+            Contract.customer_id == customer_id
+        )
     if invoice_id:
         query = query.filter(Payment.invoice_id == invoice_id)
     query = apply_data_scope(query, Payment, current_user)
-    items = query.options(joinedload(Payment.contract).joinedload(Contract.customer)).order_by(Payment.payment_date.desc()).all()
+    items = (
+        query.options(joinedload(Payment.contract).joinedload(Contract.customer))
+        .order_by(Payment.payment_date.desc())
+        .all()
+    )
     headers = ["收款编号", "客户名称", "合同编号", "金额", "收款日期", "收款方式", "创建时间"]
     rows = []
     for item in items:
-        rows.append([
-            item.payment_no, item.contract.customer.name if item.contract and item.contract.customer else "",
-            item.contract.contract_no if item.contract else "", str(item.amount) if item.amount is not None else "",
-            item.payment_date.strftime("%Y-%m-%d") if item.payment_date else "",
-            map_value(item.payment_method.value if item.payment_method else "", PAYMENT_METHOD_MAP),
-            item.created_at.strftime("%Y-%m-%d %H:%M") if item.created_at else "",
-        ])
+        rows.append(
+            [
+                item.payment_no,
+                item.contract.customer.name if item.contract and item.contract.customer else "",
+                item.contract.contract_no if item.contract else "",
+                str(item.amount) if item.amount is not None else "",
+                item.payment_date.strftime("%Y-%m-%d") if item.payment_date else "",
+                map_value(
+                    item.payment_method.value if item.payment_method else "", PAYMENT_METHOD_MAP
+                ),
+                item.created_at.strftime("%Y-%m-%d %H:%M") if item.created_at else "",
+            ]
+        )
     from datetime import datetime
-    return export_excel_response(f"payments_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx", headers, rows)
+
+    return export_excel_response(
+        f"payments_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx", headers, rows
+    )
 
 
 @router.post("", response_model=PaymentOut, status_code=201)
@@ -97,11 +121,19 @@ def create_payment(
     db: Session = Depends(get_db),
 ):
     payment = payment_service.create_payment(db, obj_in=body, created_by=current_user.id)
-    contract = db.query(Contract).filter(Contract.id == payment.contract_id).first()
+    contract = (
+        db.query(Contract)
+        .filter(Contract.id == payment.contract_id, Contract.is_deleted == False)
+        .first()
+    )
     if contract is not None and contract.created_by is not None:
         payment_date = payment.payment_date.isoformat() if payment.payment_date else "未填写"
         method_map = {"bank_transfer": "银行转账", "cash": "现金", "check": "支票"}
-        method_label = method_map.get(payment.payment_method.value, payment.payment_method.value) if payment.payment_method else "未知方式"
+        method_label = (
+            method_map.get(payment.payment_method.value, payment.payment_method.value)
+            if payment.payment_method
+            else "未知方式"
+        )
         customer_name = contract.customer.name if contract.customer else ""
         customer_line = f"客户：{customer_name}\n" if customer_name else ""
         notification_service.create(

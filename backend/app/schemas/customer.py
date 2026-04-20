@@ -1,15 +1,15 @@
-from typing import List, Optional
-from pydantic import BaseModel, field_validator, EmailStr
 from datetime import datetime
+
+from pydantic import BaseModel, EmailStr, field_validator
 
 from app.core.constants import CustomerStatus
 
 
 class CustomerContactBase(BaseModel):
     name: str
-    position: Optional[str] = None
-    phone: Optional[str] = None
-    email: Optional[EmailStr] = None
+    position: str | None = None
+    phone: str | None = None
+    email: EmailStr | None = None
     is_primary: bool = False
 
 
@@ -28,13 +28,13 @@ class CustomerContactOut(CustomerContactBase):
 class CustomerFollowUpCreate(BaseModel):
     content: str
     follow_up_at: datetime
-    next_follow_up_at: Optional[datetime] = None
+    next_follow_up_at: datetime | None = None
 
 
 class CustomerFollowUpOut(CustomerFollowUpCreate):
     id: int
     customer_id: int
-    creator_id: Optional[int] = None
+    creator_id: int | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -42,23 +42,23 @@ class CustomerFollowUpOut(CustomerFollowUpCreate):
 
 class CustomerBase(BaseModel):
     name: str
-    credit_code: Optional[str] = None
-    industry: Optional[str] = None
-    scale: Optional[str] = None
-    province: Optional[str] = None
-    city: Optional[str] = None
-    district: Optional[str] = None
-    street: Optional[str] = None
-    address: Optional[str] = None
-    website: Optional[str] = None
-    contact_name: Optional[str] = None
-    contact_phone: Optional[str] = None
+    credit_code: str | None = None
+    industry: str | None = None
+    scale: str | None = None
+    province: str | None = None
+    city: str | None = None
+    district: str | None = None
+    street: str | None = None
+    address: str | None = None
+    website: str | None = None
+    contact_name: str | None = None
+    contact_phone: str | None = None
     status: CustomerStatus = CustomerStatus.PROSPECT
-    remark: Optional[str] = None
+    remark: str | None = None
 
     @field_validator("credit_code")
     @classmethod
-    def validate_credit_code(cls, v: Optional[str]) -> Optional[str]:
+    def validate_credit_code(cls, v: str | None) -> str | None:
         if v is not None and v != "":
             if len(v) != 18:
                 raise ValueError("统一社会信用代码长度必须为18位")
@@ -68,30 +68,30 @@ class CustomerBase(BaseModel):
 
 
 class CustomerCreate(CustomerBase):
-    contacts: List[CustomerContactCreate] = []
+    contacts: list[CustomerContactCreate] = []
 
 
 class CustomerUpdate(BaseModel):
-    name: Optional[str] = None
-    credit_code: Optional[str] = None
-    industry: Optional[str] = None
-    scale: Optional[str] = None
-    province: Optional[str] = None
-    city: Optional[str] = None
-    district: Optional[str] = None
-    street: Optional[str] = None
-    address: Optional[str] = None
-    website: Optional[str] = None
-    contact_name: Optional[str] = None
-    contact_phone: Optional[str] = None
-    status: Optional[CustomerStatus] = None
-    remark: Optional[str] = None
+    name: str | None = None
+    credit_code: str | None = None
+    industry: str | None = None
+    scale: str | None = None
+    province: str | None = None
+    city: str | None = None
+    district: str | None = None
+    street: str | None = None
+    address: str | None = None
+    website: str | None = None
+    contact_name: str | None = None
+    contact_phone: str | None = None
+    status: CustomerStatus | None = None
+    remark: str | None = None
 
 
 class CustomerOut(CustomerBase):
     id: int
     created_at: datetime
-    contacts: List[CustomerContactOut] = []
+    contacts: list[CustomerContactOut] = []
 
     model_config = {"from_attributes": True}
 

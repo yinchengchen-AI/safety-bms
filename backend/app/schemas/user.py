@@ -1,10 +1,10 @@
-from typing import List, Optional
-from pydantic import BaseModel, EmailStr, field_validator
-from datetime import datetime
 import re
+from datetime import datetime
+
+from pydantic import BaseModel, EmailStr, field_validator
 
 
-def _presign_avatar_url(v: Optional[str]) -> Optional[str]:
+def _presign_avatar_url(v: str | None) -> str | None:
     if isinstance(v, str) and v and not v.startswith("http"):
         try:
             from app.services.minio_service import minio_service
@@ -17,7 +17,7 @@ def _presign_avatar_url(v: Optional[str]) -> Optional[str]:
 
 class RoleBase(BaseModel):
     name: str
-    description: Optional[str] = None
+    description: str | None = None
 
 
 class RoleCreate(RoleBase):
@@ -43,14 +43,14 @@ class PermissionOut(BaseModel):
 class UserBase(BaseModel):
     username: str
     email: EmailStr
-    full_name: Optional[str] = None
-    phone: Optional[str] = None
+    full_name: str | None = None
+    phone: str | None = None
 
 
 class UserCreate(UserBase):
     password: str
-    role_ids: List[int] = []
-    department_id: Optional[int] = None
+    role_ids: list[int] = []
+    department_id: int | None = None
 
     @field_validator("password")
     @classmethod
@@ -63,24 +63,24 @@ class UserCreate(UserBase):
 
 
 class UserUpdate(BaseModel):
-    full_name: Optional[str] = None
-    phone: Optional[str] = None
-    email: Optional[EmailStr] = None
-    is_active: Optional[bool] = None
-    role_ids: Optional[List[int]] = None
-    department_id: Optional[int] = None
+    full_name: str | None = None
+    phone: str | None = None
+    email: EmailStr | None = None
+    is_active: bool | None = None
+    role_ids: list[int] | None = None
+    department_id: int | None = None
 
 
 class UserOut(UserBase):
     id: int
     is_active: bool
     is_superuser: bool
-    avatar_url: Optional[str] = None
-    last_login_at: Optional[datetime] = None
+    avatar_url: str | None = None
+    last_login_at: datetime | None = None
     created_at: datetime
-    roles: List[RoleOut] = []
-    permissions: List[str] = []
-    department_id: Optional[int] = None
+    roles: list[RoleOut] = []
+    permissions: list[str] = []
+    department_id: int | None = None
 
     model_config = {"from_attributes": True}
 

@@ -1,7 +1,6 @@
 from collections import defaultdict
 from datetime import date
 from decimal import Decimal
-from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import and_, case, extract, func
@@ -13,7 +12,6 @@ from app.core.constants import (
     PermissionCode,
     ServiceOrderStatus,
 )
-from app.models.service_type import ServiceType as ServiceTypeModel
 from app.db.session import get_db
 from app.dependencies import require_permissions
 from app.models.contract import Contract
@@ -21,11 +19,12 @@ from app.models.customer import Customer
 from app.models.invoice import Invoice
 from app.models.payment import Payment
 from app.models.service import ServiceOrder
+from app.models.service_type import ServiceType as ServiceTypeModel
 from app.models.user import User
 from app.schemas.analytics import (
-    AnalyticsOverviewOut,
     AnalyticsDrilldownItemOut,
     AnalyticsDrilldownOut,
+    AnalyticsOverviewOut,
     CustomerGrowthItemOut,
     CustomerIndustryDistributionItemOut,
     CustomerInsightsOut,
@@ -72,18 +71,16 @@ def _invoice_metric_date_expr():
     return func.coalesce(Invoice.invoice_date, func.date(Invoice.created_at))
 
 
-def _period_key(
-    year: Decimal | float | int | None, month: Decimal | float | int | None
-) -> str:
+def _period_key(year: Decimal | float | int | None, month: Decimal | float | int | None) -> str:
     return f"{_to_int(year):04d}-{_to_int(month):02d}"
 
 
 def _apply_contract_filters(
     query,
     current_user: User,
-    date_from: Optional[date],
-    date_to: Optional[date],
-    service_type: Optional[int],
+    date_from: date | None,
+    date_to: date | None,
+    service_type: int | None,
 ):
     query = query.filter(
         Contract.is_deleted == False,
@@ -104,9 +101,9 @@ def _apply_contract_filters(
 def _apply_invoice_filters(
     query,
     current_user: User,
-    date_from: Optional[date],
-    date_to: Optional[date],
-    service_type: Optional[int],
+    date_from: date | None,
+    date_to: date | None,
+    service_type: int | None,
 ):
     invoice_metric_date = _invoice_metric_date_expr()
     query = query.filter(Invoice.status.in_([InvoiceStatus.ISSUED, InvoiceStatus.SENT]))
@@ -124,9 +121,9 @@ def _apply_invoice_filters(
 def _apply_payment_filters(
     query,
     current_user: User,
-    date_from: Optional[date],
-    date_to: Optional[date],
-    service_type: Optional[int],
+    date_from: date | None,
+    date_to: date | None,
+    service_type: int | None,
 ):
     if service_type:
         query = query.join(Contract, Payment.contract_id == Contract.id).filter(
@@ -142,14 +139,12 @@ def _apply_payment_filters(
 def _contract_ids_for_filters(
     db: Session,
     current_user: User,
-    date_from: Optional[date],
-    date_to: Optional[date],
-    service_type: Optional[int],
+    date_from: date | None,
+    date_to: date | None,
+    service_type: int | None,
 ) -> list[int]:
     query = db.query(Contract.id)
-    query = _apply_contract_filters(
-        query, current_user, date_from, date_to, service_type
-    )
+    query = _apply_contract_filters(query, current_user, date_from, date_to, service_type)
     return [item[0] for item in query.all()]
 
 
@@ -161,9 +156,7 @@ def _month_range(period: str) -> tuple[date, date]:
     if month == 12:
         end = date(year + 1, 1, 1).fromordinal(date(year + 1, 1, 1).toordinal() - 1)
     else:
-        end = date(year, month + 1, 1).fromordinal(
-            date(year, month + 1, 1).toordinal() - 1
-        )
+        end = date(year, month + 1, 1).fromordinal(date(year, month + 1, 1).toordinal() - 1)
     return start, end
 
 
@@ -171,12 +164,12 @@ def _build_drilldown_rows(
     db: Session,
     current_user: User,
     source: str,
-    period: Optional[str],
-    series_type: Optional[str],
-    group_value: Optional[str],
-    date_from: Optional[date],
-    date_to: Optional[date],
-    service_type: Optional[int],
+    period: str | None,
+    series_type: str | None,
+    group_value: str | None,
+    date_from: date | None,
+    date_to: date | None,
+    service_type: int | None,
 ) -> list[AnalyticsDrilldownItemOut]:
     if period:
         date_from, date_to = _month_range(period)
@@ -184,9 +177,7 @@ def _build_drilldown_rows(
     if source == "revenue":
         if series_type == "签约额":
             query = db.query(Contract)
-            query = _apply_contract_filters(
-                query, current_user, date_from, date_to, service_type
-            )
+            query = _apply_contract_filters(query, current_user, date_from, date_to, service_type)
             items = (
                 query.options(joinedload(Contract.customer))
                 .order_by(Contract.sign_date.desc(), Contract.created_at.desc())
@@ -208,13 +199,9 @@ def _build_drilldown_rows(
 
         if series_type == "开票额":
             query = db.query(Invoice)
-            query = _apply_invoice_filters(
-                query, current_user, date_from, date_to, service_type
-            )
+            query = _apply_invoice_filters(query, current_user, date_from, date_to, service_type)
             items = (
-                query.options(
-                    joinedload(Invoice.contract).joinedload(Contract.customer)
-                )
+                query.options(joinedload(Invoice.contract).joinedload(Contract.customer))
                 .order_by(Invoice.created_at.desc())
                 .all()
             )
@@ -223,17 +210,17 @@ def _build_drilldown_rows(
                     id=item.id,
                     category="invoice",
                     primary_label=item.invoice_no,
-                    secondary_label=item.contract.customer.name
-                    if item.contract and item.contract.customer
-                    else item.contract.contract_no
-                    if item.contract
-                    else None,
+                    secondary_label=(
+                        item.contract.customer.name
+                        if item.contract and item.contract.customer
+                        else item.contract.contract_no if item.contract else None
+                    ),
                     amount=round(_to_float(item.amount), 2),
-                    date_label=item.invoice_date.isoformat()
-                    if item.invoice_date
-                    else item.created_at.date().isoformat()
-                    if item.created_at
-                    else None,
+                    date_label=(
+                        item.invoice_date.isoformat()
+                        if item.invoice_date
+                        else item.created_at.date().isoformat() if item.created_at else None
+                    ),
                     status=enum_value(item.status),
                     extra=item.contract.contract_no if item.contract else None,
                 )
@@ -241,9 +228,7 @@ def _build_drilldown_rows(
             ]
 
         query = db.query(Payment)
-        query = _apply_payment_filters(
-            query, current_user, date_from, date_to, service_type
-        )
+        query = _apply_payment_filters(query, current_user, date_from, date_to, service_type)
         items = (
             query.options(joinedload(Payment.contract).joinedload(Contract.customer))
             .order_by(Payment.payment_date.desc(), Payment.created_at.desc())
@@ -254,11 +239,11 @@ def _build_drilldown_rows(
                 id=item.id,
                 category="payment",
                 primary_label=item.payment_no,
-                secondary_label=item.contract.customer.name
-                if item.contract and item.contract.customer
-                else item.contract.contract_no
-                if item.contract
-                else None,
+                secondary_label=(
+                    item.contract.customer.name
+                    if item.contract and item.contract.customer
+                    else item.contract.contract_no if item.contract else None
+                ),
                 amount=round(_to_float(item.amount), 2),
                 date_label=item.payment_date.isoformat() if item.payment_date else None,
                 status="received",
@@ -333,9 +318,7 @@ def _build_drilldown_rows(
                 .group_by(Payment.contract_id)
                 .all()
             )
-            payment_map = {
-                item.contract_id: _to_float(item.total) for item in payment_results
-            }
+            payment_map = {item.contract_id: _to_float(item.total) for item in payment_results}
         today = date.today()
         result: list[AnalyticsDrilldownItemOut] = []
         for contract in contracts:
@@ -360,9 +343,7 @@ def _build_drilldown_rows(
                     id=contract.id,
                     category="contract",
                     primary_label=contract.contract_no,
-                    secondary_label=contract.customer.name
-                    if contract.customer
-                    else contract.title,
+                    secondary_label=contract.customer.name if contract.customer else contract.title,
                     amount=receivable_amount,
                     date_label=end_date.isoformat(),
                     status=str(overdue_days),
@@ -391,9 +372,7 @@ def _build_drilldown_rows(
                 primary_label=item.name,
                 secondary_label=item.contact_name,
                 amount=None,
-                date_label=item.created_at.date().isoformat()
-                if item.created_at
-                else None,
+                date_label=item.created_at.date().isoformat() if item.created_at else None,
                 status=enum_value(item.status),
                 extra=item.industry,
             )
@@ -417,9 +396,7 @@ def _build_drilldown_rows(
                 primary_label=item.name,
                 secondary_label=item.contact_name,
                 amount=None,
-                date_label=item.created_at.date().isoformat()
-                if item.created_at
-                else None,
+                date_label=item.created_at.date().isoformat() if item.created_at else None,
                 status=enum_value(item.status),
                 extra=item.industry,
             )
@@ -447,13 +424,13 @@ def _build_drilldown_rows(
                 id=item.id,
                 category="service",
                 primary_label=item.order_no,
-                secondary_label=item.contract.customer.name
-                if item.contract and item.contract.customer
-                else item.title,
+                secondary_label=(
+                    item.contract.customer.name
+                    if item.contract and item.contract.customer
+                    else item.title
+                ),
                 amount=None,
-                date_label=item.created_at.date().isoformat()
-                if item.created_at
-                else None,
+                date_label=item.created_at.date().isoformat() if item.created_at else None,
                 status=enum_value(item.status),
                 extra=item.assignee.full_name if item.assignee else item.title,
             )
@@ -465,12 +442,10 @@ def _build_drilldown_rows(
 
 @router.get("/overview", response_model=AnalyticsOverviewOut)
 def get_analytics_overview(
-    date_from: Optional[date] = None,
-    date_to: Optional[date] = None,
-    service_type: Optional[int] = None,
-    current_user: User = Depends(
-        require_permissions(PermissionCode.ANALYTICS_READ.value)
-    ),
+    date_from: date | None = None,
+    date_to: date | None = None,
+    service_type: int | None = None,
+    current_user: User = Depends(require_permissions(PermissionCode.ANALYTICS_READ.value)),
     db: Session = Depends(get_db),
 ):
     signed_query = db.query(func.coalesce(func.sum(Contract.total_amount), 0))
@@ -491,9 +466,7 @@ def get_analytics_overview(
     )
     received_amount = _to_float(payment_query.scalar())
 
-    contract_ids = _contract_ids_for_filters(
-        db, current_user, date_from, date_to, service_type
-    )
+    contract_ids = _contract_ids_for_filters(db, current_user, date_from, date_to, service_type)
     received_by_contract = {}
     if contract_ids:
         results = (
@@ -505,9 +478,7 @@ def get_analytics_overview(
             .group_by(Payment.contract_id)
             .all()
         )
-        received_by_contract = {
-            item.contract_id: _to_float(item.total) for item in results
-        }
+        received_by_contract = {item.contract_id: _to_float(item.total) for item in results}
 
     overdue_contract_count = 0
     receivable_balance = 0.0
@@ -515,9 +486,9 @@ def get_analytics_overview(
         contracts = db.query(Contract).filter(Contract.id.in_(contract_ids)).all()
         today = date.today()
         for contract in contracts:
-            receivable_amount = _contract_total_amount(
-                contract
-            ) - received_by_contract.get(contract.id, 0.0)
+            receivable_amount = _contract_total_amount(contract) - received_by_contract.get(
+                contract.id, 0.0
+            )
             if receivable_amount <= 0:
                 continue
             receivable_balance += receivable_amount
@@ -541,12 +512,10 @@ def get_analytics_overview(
 
 @router.get("/revenue-trend", response_model=RevenueTrendOut)
 def get_revenue_trend(
-    date_from: Optional[date] = None,
-    date_to: Optional[date] = None,
-    service_type: Optional[int] = None,
-    current_user: User = Depends(
-        require_permissions(PermissionCode.ANALYTICS_READ.value)
-    ),
+    date_from: date | None = None,
+    date_to: date | None = None,
+    service_type: int | None = None,
+    current_user: User = Depends(require_permissions(PermissionCode.ANALYTICS_READ.value)),
     db: Session = Depends(get_db),
 ):
     invoice_metric_date = _invoice_metric_date_expr()
@@ -633,9 +602,7 @@ def get_revenue_trend(
             signed_amount=round(values["signed_amount"], 2),
             invoiced_amount=round(values["invoiced_amount"], 2),
             received_amount=round(values["received_amount"], 2),
-            receivable_balance=round(
-                values["signed_amount"] - values["received_amount"], 2
-            ),
+            receivable_balance=round(values["signed_amount"] - values["received_amount"], 2),
         )
         for period, values in sorted(trend_map.items())
     ]
@@ -644,13 +611,11 @@ def get_revenue_trend(
 
 @router.get("/performance-ranking", response_model=PerformanceRankingOut)
 def get_performance_ranking(
-    date_from: Optional[date] = None,
-    date_to: Optional[date] = None,
-    service_type: Optional[int] = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    service_type: int | None = None,
     limit: int = Query(10, ge=1, le=50),
-    current_user: User = Depends(
-        require_permissions(PermissionCode.ANALYTICS_READ.value)
-    ),
+    current_user: User = Depends(require_permissions(PermissionCode.ANALYTICS_READ.value)),
     db: Session = Depends(get_db),
 ):
     ranking_map: dict[int, PerformanceRankingItemOut] = {}
@@ -743,12 +708,10 @@ def get_performance_ranking(
 
 @router.get("/receivable-aging", response_model=ReceivableAgingOut)
 def get_receivable_aging(
-    date_from: Optional[date] = None,
-    date_to: Optional[date] = None,
-    service_type: Optional[int] = None,
-    current_user: User = Depends(
-        require_permissions(PermissionCode.ANALYTICS_READ.value)
-    ),
+    date_from: date | None = None,
+    date_to: date | None = None,
+    service_type: int | None = None,
+    current_user: User = Depends(require_permissions(PermissionCode.ANALYTICS_READ.value)),
     db: Session = Depends(get_db),
 ):
     contract_query = db.query(Contract)
@@ -769,9 +732,7 @@ def get_receivable_aging(
             .group_by(Payment.contract_id)
             .all()
         )
-        payment_map = {
-            item.contract_id: _to_float(item.total) for item in payment_results
-        }
+        payment_map = {item.contract_id: _to_float(item.total) for item in payment_results}
 
     bucket_map = {
         "0-30": {"contract_count": 0, "amount": 0.0},
@@ -826,11 +787,9 @@ def get_receivable_aging(
 
 @router.get("/customer-insights", response_model=CustomerInsightsOut)
 def get_customer_insights(
-    date_from: Optional[date] = None,
-    date_to: Optional[date] = None,
-    current_user: User = Depends(
-        require_permissions(PermissionCode.ANALYTICS_READ.value)
-    ),
+    date_from: date | None = None,
+    date_to: date | None = None,
+    current_user: User = Depends(require_permissions(PermissionCode.ANALYTICS_READ.value)),
     db: Session = Depends(get_db),
 ):
     growth_query = db.query(
@@ -860,17 +819,11 @@ def get_customer_insights(
         func.count(Customer.id).label("count"),
     ).filter(Customer.is_deleted == False)
     if date_from:
-        industry_query = industry_query.filter(
-            func.date(Customer.created_at) >= date_from
-        )
+        industry_query = industry_query.filter(func.date(Customer.created_at) >= date_from)
     if date_to:
-        industry_query = industry_query.filter(
-            func.date(Customer.created_at) <= date_to
-        )
+        industry_query = industry_query.filter(func.date(Customer.created_at) <= date_to)
     industry_query = apply_data_scope(industry_query, Customer, current_user)
-    industry_results = industry_query.group_by(
-        func.coalesce(Customer.industry, "未填写")
-    ).all()
+    industry_results = industry_query.group_by(func.coalesce(Customer.industry, "未填写")).all()
 
     status_query = db.query(
         Customer.status.label("status"),
@@ -891,15 +844,11 @@ def get_customer_insights(
             for item in growth_results
         ],
         industry_distribution=[
-            CustomerIndustryDistributionItemOut(
-                industry=str(item.industry), count=int(item.count)
-            )
+            CustomerIndustryDistributionItemOut(industry=str(item.industry), count=int(item.count))
             for item in industry_results
         ],
         status_distribution=[
-            CustomerStatusDistributionItemOut(
-                status=enum_value(item.status), count=int(item.count)
-            )
+            CustomerStatusDistributionItemOut(status=enum_value(item.status), count=int(item.count))
             for item in status_results
         ],
     )
@@ -907,12 +856,10 @@ def get_customer_insights(
 
 @router.get("/service-efficiency", response_model=ServiceEfficiencyOut)
 def get_service_efficiency(
-    date_from: Optional[date] = None,
-    date_to: Optional[date] = None,
-    service_type: Optional[int] = None,
-    current_user: User = Depends(
-        require_permissions(PermissionCode.ANALYTICS_READ.value)
-    ),
+    date_from: date | None = None,
+    date_to: date | None = None,
+    service_type: int | None = None,
+    current_user: User = Depends(require_permissions(PermissionCode.ANALYTICS_READ.value)),
     db: Session = Depends(get_db),
 ):
     today = date.today()
@@ -961,9 +908,7 @@ def get_service_efficiency(
         ).label("overdue_orders"),
     )
     if date_from:
-        trend_query = trend_query.filter(
-            func.date(ServiceOrder.created_at) >= date_from
-        )
+        trend_query = trend_query.filter(func.date(ServiceOrder.created_at) >= date_from)
     if date_to:
         trend_query = trend_query.filter(func.date(ServiceOrder.created_at) <= date_to)
     if service_type:
@@ -999,9 +944,7 @@ def get_service_efficiency(
         completed_orders = int(item.completed_orders or 0)
         on_time_orders = int(item.on_time_orders or 0)
         on_time_rate = (
-            round((on_time_orders / completed_orders) * 100, 2)
-            if completed_orders > 0
-            else 0.0
+            round((on_time_orders / completed_orders) * 100, 2) if completed_orders > 0 else 0.0
         )
         trend_items.append(
             ServiceEfficiencyTrendItemOut(
@@ -1028,15 +971,13 @@ def get_service_efficiency(
 @router.get("/drilldown", response_model=AnalyticsDrilldownOut)
 def get_analytics_drilldown(
     source: str,
-    period: Optional[str] = None,
-    series_type: Optional[str] = None,
-    group_value: Optional[str] = None,
-    date_from: Optional[date] = None,
-    date_to: Optional[date] = None,
-    service_type: Optional[int] = None,
-    current_user: User = Depends(
-        require_permissions(PermissionCode.ANALYTICS_READ.value)
-    ),
+    period: str | None = None,
+    series_type: str | None = None,
+    group_value: str | None = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    service_type: int | None = None,
+    current_user: User = Depends(require_permissions(PermissionCode.ANALYTICS_READ.value)),
     db: Session = Depends(get_db),
 ):
     items = _build_drilldown_rows(
@@ -1056,15 +997,13 @@ def get_analytics_drilldown(
 @router.get("/export")
 def export_analytics_drilldown(
     source: str,
-    period: Optional[str] = None,
-    series_type: Optional[str] = None,
-    group_value: Optional[str] = None,
-    date_from: Optional[date] = None,
-    date_to: Optional[date] = None,
-    service_type: Optional[int] = None,
-    current_user: User = Depends(
-        require_permissions(PermissionCode.ANALYTICS_READ.value)
-    ),
+    period: str | None = None,
+    series_type: str | None = None,
+    group_value: str | None = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    service_type: int | None = None,
+    current_user: User = Depends(require_permissions(PermissionCode.ANALYTICS_READ.value)),
     db: Session = Depends(get_db),
 ):
     items = _build_drilldown_rows(
@@ -1078,6 +1017,7 @@ def export_analytics_drilldown(
         date_to=date_to,
         service_type=service_type,
     )
+
     def _map_drilldown_status(category: str, status: str | None) -> str:
         if not status:
             return ""

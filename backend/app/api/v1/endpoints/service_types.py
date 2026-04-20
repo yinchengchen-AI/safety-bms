@@ -1,15 +1,14 @@
-from typing import Optional
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from app.db.session import get_db
-from app.schemas.service_type import ServiceTypeCreate, ServiceTypeUpdate, ServiceTypeOut
-from app.schemas.common import PageResponse, ResponseMsg
-from app.crud.service_type import crud_service_type
-from app.dependencies import require_permissions
-from app.core.exceptions import NotFoundError, BusinessError
 from app.core.constants import PermissionCode
+from app.core.exceptions import BusinessError, NotFoundError
+from app.crud.service_type import crud_service_type
+from app.db.session import get_db
+from app.dependencies import require_permissions
 from app.models.user import User
+from app.schemas.common import PageResponse, ResponseMsg
+from app.schemas.service_type import ServiceTypeCreate, ServiceTypeOut, ServiceTypeUpdate
 from app.utils.pagination import make_page_response
 
 router = APIRouter(prefix="/service-types", tags=["服务类型管理"])
@@ -19,7 +18,7 @@ router = APIRouter(prefix="/service-types", tags=["服务类型管理"])
 def list_service_types(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=200),
-    is_active: Optional[bool] = None,
+    is_active: bool | None = None,
     current_user: User = Depends(require_permissions(PermissionCode.SERVICE_READ)),
     db: Session = Depends(get_db),
 ):

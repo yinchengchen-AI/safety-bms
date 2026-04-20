@@ -1,12 +1,12 @@
-from typing import List, Optional, Tuple
 from decimal import Decimal
-from sqlalchemy.orm import Session
-from sqlalchemy import func
 
+from sqlalchemy import func
+from sqlalchemy.orm import Session
+
+from app.core.constants import InvoiceStatus
 from app.crud.base import CRUDBase
 from app.models.invoice import Invoice
 from app.schemas.invoice import InvoiceCreate, InvoiceUpdate
-from app.core.constants import InvoiceStatus
 
 
 class CRUDInvoice(CRUDBase[Invoice, InvoiceCreate, InvoiceUpdate]):
@@ -30,18 +30,16 @@ class CRUDInvoice(CRUDBase[Invoice, InvoiceCreate, InvoiceUpdate]):
         *,
         skip: int = 0,
         limit: int = 20,
-        contract_id: Optional[int] = None,
-        status: Optional[InvoiceStatus] = None,
-    ) -> Tuple[int, List[Invoice]]:
+        contract_id: int | None = None,
+        status: InvoiceStatus | None = None,
+    ) -> tuple[int, list[Invoice]]:
         query = db.query(Invoice)
         if contract_id:
             query = query.filter(Invoice.contract_id == contract_id)
         if status:
             query = query.filter(Invoice.status == status)
         total = query.count()
-        items = (
-            query.order_by(Invoice.created_at.desc()).offset(skip).limit(limit).all()
-        )
+        items = query.order_by(Invoice.created_at.desc()).offset(skip).limit(limit).all()
         return total, items
 
     def get_sum_by_contract(self, db: Session, *, contract_id: int) -> Decimal:

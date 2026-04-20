@@ -1,17 +1,17 @@
-from typing import Optional
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from app.db.session import get_db
-from app.schemas.department import DepartmentCreate, DepartmentUpdate, DepartmentOut
-from app.schemas.common import PageResponse, ResponseMsg
-from app.crud.department import crud_department
-from app.dependencies import require_permissions
-from app.core.exceptions import NotFoundError
-from app.models.user import User
-from app.utils.pagination import make_page_response
 from app.core.constants import PermissionCode
+from app.core.exceptions import NotFoundError
+from app.crud.department import crud_department
+from app.db.session import get_db
+from app.dependencies import require_permissions
+from app.models.department import Department
+from app.models.user import User
+from app.schemas.common import PageResponse, ResponseMsg
+from app.schemas.department import DepartmentCreate, DepartmentOut, DepartmentUpdate
 from app.utils.excel_export import export_excel_response
+from app.utils.pagination import make_page_response
 
 router = APIRouter(prefix="/departments", tags=["部门管理"])
 
@@ -20,7 +20,7 @@ router = APIRouter(prefix="/departments", tags=["部门管理"])
 def list_departments(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=200),
-    keyword: Optional[str] = None,
+    keyword: str | None = None,
     _: User = Depends(require_permissions(PermissionCode.DEPARTMENT_READ.value)),
     db: Session = Depends(get_db),
 ):
@@ -31,7 +31,7 @@ def list_departments(
 
 @router.get("/export")
 def export_departments(
-    keyword: Optional[str] = None,
+    keyword: str | None = None,
     _: User = Depends(require_permissions(PermissionCode.DEPARTMENT_READ.value)),
     db: Session = Depends(get_db),
 ):
@@ -42,13 +42,19 @@ def export_departments(
     headers = ["部门名称", "描述", "上级部门", "创建时间"]
     rows = []
     for d in items:
-        rows.append([
-            d.name, d.description or "",
-            d.parent.name if d.parent else "",
-            d.created_at.strftime("%Y-%m-%d %H:%M") if d.created_at else "",
-        ])
+        rows.append(
+            [
+                d.name,
+                d.description or "",
+                d.parent.name if d.parent else "",
+                d.created_at.strftime("%Y-%m-%d %H:%M") if d.created_at else "",
+            ]
+        )
     from datetime import datetime
-    return export_excel_response(f"departments_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx", headers, rows)
+
+    return export_excel_response(
+        f"departments_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx", headers, rows
+    )
 
 
 @router.post("", response_model=DepartmentOut, status_code=201)

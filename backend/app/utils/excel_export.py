@@ -1,5 +1,5 @@
 from io import BytesIO
-from typing import List, Any
+from typing import Any
 from urllib.parse import quote
 
 from fastapi import Response
@@ -7,7 +7,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Font
 
 
-def export_excel_response(filename: str, headers: List[str], rows: List[List[Any]]) -> Response:
+def export_excel_response(filename: str, headers: list[str], rows: list[list[Any]]) -> Response:
     wb = Workbook()
     ws = wb.active
     if ws is None:

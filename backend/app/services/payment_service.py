@@ -1,22 +1,20 @@
-from decimal import Decimal
 from datetime import date
+from decimal import Decimal
+
 from sqlalchemy.orm import Session
 
+from app.core.exceptions import BusinessError, NotFoundError, PaymentAmountExceededError
 from app.crud.payment import crud_payment
-from app.core.exceptions import NotFoundError, PaymentAmountExceededError, BusinessError
-from app.schemas.payment import PaymentCreate, ContractReceivable
-from app.models.payment import Payment
 from app.models.contract import Contract
 from app.models.invoice import Invoice
+from app.models.payment import Payment
+from app.schemas.payment import ContractReceivable, PaymentCreate
 
 
 class PaymentService:
     def create_payment(self, db: Session, *, obj_in: PaymentCreate, created_by: int) -> Payment:
         contract = (
-            db.query(Contract)
-            .filter(Contract.id == obj_in.contract_id)
-            .with_for_update()
-            .first()
+            db.query(Contract).filter(Contract.id == obj_in.contract_id).with_for_update().first()
         )
         if not contract:
             raise NotFoundError("合同")
@@ -58,9 +56,7 @@ class PaymentService:
 
         # 逾期判断：合同结束日期已过且未收齐
         is_overdue = (
-            contract.end_date is not None
-            and contract.end_date < date.today()
-            and receivable > 0
+            contract.end_date is not None and contract.end_date < date.today() and receivable > 0
         )
 
         return ContractReceivable(
@@ -74,6 +70,7 @@ class PaymentService:
 
     def get_overdue_contracts(self, db: Session) -> list[ContractReceivable]:
         from app.core.constants import ContractStatus
+
         contracts = (
             db.query(Contract)
             .filter(

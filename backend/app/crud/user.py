@@ -1,17 +1,16 @@
-from typing import List, Optional, Tuple
 from sqlalchemy.orm import Session
 
-from app.crud.base import CRUDBase
-from app.models.user import User, Role
-from app.schemas.user import UserCreate, UserUpdate
 from app.core.security import get_password_hash, verify_password
+from app.crud.base import CRUDBase
+from app.models.user import Role, User
+from app.schemas.user import UserCreate, UserUpdate
 
 
 class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
-    def get_by_username(self, db: Session, *, username: str) -> Optional[User]:
+    def get_by_username(self, db: Session, *, username: str) -> User | None:
         return db.query(User).filter(User.username == username).first()
 
-    def get_by_email(self, db: Session, *, email: str) -> Optional[User]:
+    def get_by_email(self, db: Session, *, email: str) -> User | None:
         return db.query(User).filter(User.email == email).first()
 
     def create(self, db: Session, *, obj_in: UserCreate) -> User:
@@ -27,10 +26,7 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
         return db_obj
 
     def update(self, db: Session, *, db_obj: User, obj_in: UserUpdate | dict) -> User:
-        if isinstance(obj_in, dict):
-            update_data = obj_in
-        else:
-            update_data = obj_in.model_dump(exclude_unset=True)
+        update_data = obj_in if isinstance(obj_in, dict) else obj_in.model_dump(exclude_unset=True)
 
         role_ids = update_data.pop("role_ids", None)
         for field, value in update_data.items():
@@ -43,7 +39,7 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
         db.refresh(db_obj)
         return db_obj
 
-    def authenticate(self, db: Session, *, username: str, password: str) -> Optional[User]:
+    def authenticate(self, db: Session, *, username: str, password: str) -> User | None:
         user = self.get_by_username(db, username=username)
         if not user:
             return None
@@ -57,9 +53,9 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
         *,
         skip: int = 0,
         limit: int = 20,
-        is_active: Optional[bool] = None,
-        department_id: Optional[int] = None,
-    ) -> Tuple[int, List[User]]:
+        is_active: bool | None = None,
+        department_id: int | None = None,
+    ) -> tuple[int, list[User]]:
         query = db.query(User)
         if is_active is not None:
             query = query.filter(User.is_active == is_active)
@@ -69,7 +65,7 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
         items = query.offset(skip).limit(limit).all()
         return total, items
 
-    def get_all_roles(self, db: Session) -> List[Role]:
+    def get_all_roles(self, db: Session) -> list[Role]:
         return db.query(Role).all()
 
 

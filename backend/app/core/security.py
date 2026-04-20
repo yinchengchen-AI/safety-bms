@@ -1,7 +1,8 @@
-from datetime import datetime, timedelta, timezone
-from typing import Any, Optional
-from jose import JWTError, jwt
+from datetime import UTC, datetime, timedelta
+from typing import Any
+
 import bcrypt
+from jose import jwt
 
 from app.config import settings
 
@@ -15,7 +16,7 @@ def get_password_hash(password: str) -> str:
 
 
 def create_access_token(subject: Any, extra_data: dict | None = None) -> str:
-    expire = datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    expire = datetime.now(UTC) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     data: dict = {"sub": str(subject), "exp": expire, "type": "access"}
     if extra_data:
         data.update(extra_data)
@@ -23,7 +24,7 @@ def create_access_token(subject: Any, extra_data: dict | None = None) -> str:
 
 
 def create_refresh_token(subject: Any) -> str:
-    expire = datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+    expire = datetime.now(UTC) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
     data: dict = {"sub": str(subject), "exp": expire, "type": "refresh"}
     return jwt.encode(data, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 

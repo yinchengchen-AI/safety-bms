@@ -1,7 +1,7 @@
-from enum import Enum
+from enum import StrEnum
 
 
-class PermissionCode(str, Enum):
+class PermissionCode(StrEnum):
     # customer
     CUSTOMER_READ = "customer:read"
     CUSTOMER_CREATE = "customer:create"
@@ -57,13 +57,13 @@ class PermissionCode(str, Enum):
     REPORT_READ = "report:read"
 
 
-class DataScope(str, Enum):
+class DataScope(StrEnum):
     ALL = "ALL"  # 全部数据
     DEPT = "DEPT"  # 本部门数据
     SELF = "SELF"  # 仅本人数据
 
 
-class UserRole(str, Enum):
+class UserRole(StrEnum):
     ADMIN = "admin"  # 系统管理员
     SALES = "sales"  # 销售
     SERVICE = "service"  # 服务人员
@@ -71,13 +71,13 @@ class UserRole(str, Enum):
     VIEWER = "viewer"  # 只读查看
 
 
-class CustomerStatus(str, Enum):
+class CustomerStatus(StrEnum):
     PROSPECT = "prospect"  # 意向
     SIGNED = "signed"  # 成交
     CHURNED = "churned"  # 流失
 
 
-class ContractStatus(str, Enum):
+class ContractStatus(StrEnum):
     DRAFT = "draft"  # 草稿
     REVIEW = "review"  # 审核中
     ACTIVE = "active"  # 生效
@@ -86,7 +86,7 @@ class ContractStatus(str, Enum):
     TERMINATED = "terminated"  # 终止
 
 
-class ServiceType(str, Enum):
+class ServiceType(StrEnum):
     EVALUATION = "evaluation"  # 安全评价
     TRAINING = "training"  # 安全培训
     INSPECTION = "inspection"  # 安全检测检验
@@ -94,31 +94,31 @@ class ServiceType(str, Enum):
     EMERGENCY_PLAN = "emergency_plan"  # 应急预案编制
 
 
-class ServiceOrderStatus(str, Enum):
+class ServiceOrderStatus(StrEnum):
     PENDING = "pending"  # 待开始
     IN_PROGRESS = "in_progress"  # 进行中
     COMPLETED = "completed"  # 已完成
     ACCEPTED = "accepted"  # 已验收
 
 
-class InvoiceType(str, Enum):
+class InvoiceType(StrEnum):
     SPECIAL = "special"  # 增值税专用发票
     GENERAL = "general"  # 增值税普通发票
 
 
-class InvoiceStatus(str, Enum):
+class InvoiceStatus(StrEnum):
     APPLYING = "applying"  # 申请中
     ISSUED = "issued"  # 已开票
     SENT = "sent"  # 已寄出
     REJECTED = "rejected"  # 已拒绝
 
 
-class PaymentMethod(str, Enum):
+class PaymentMethod(StrEnum):
     BANK_TRANSFER = "bank_transfer"  # 银行转账
     CASH = "cash"  # 现金
     CHECK = "check"  # 支票
 
 
-class PaymentPlan(str, Enum):
+class PaymentPlan(StrEnum):
     ONCE = "once"  # 一次性
     INSTALLMENT = "installment"  # 分期

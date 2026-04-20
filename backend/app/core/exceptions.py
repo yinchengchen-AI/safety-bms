@@ -1,9 +1,11 @@
 from decimal import Decimal
+
 from fastapi import HTTPException, status
 
 
 class BusinessError(HTTPException):
     """业务逻辑错误基类"""
+
     def __init__(self, detail: str, status_code: int = status.HTTP_400_BAD_REQUEST):
         super().__init__(status_code=status_code, detail=detail)
 
@@ -39,7 +41,4 @@ class ContractStatusError(BusinessError):
 
 class PermissionDeniedError(HTTPException):
     def __init__(self):
-        super().__init__(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="权限不足"
-        )
+        super().__init__(status_code=status.HTTP_403_FORBIDDEN, detail="权限不足")

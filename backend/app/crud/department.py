@@ -1,4 +1,3 @@
-from typing import List, Optional, Tuple
 from sqlalchemy.orm import Session
 
 from app.crud.base import CRUDBase
@@ -13,8 +12,8 @@ class CRUDDepartment(CRUDBase[Department, DepartmentCreate, DepartmentUpdate]):
         *,
         skip: int = 0,
         limit: int = 20,
-        keyword: Optional[str] = None,
-    ) -> Tuple[int, List[Department]]:
+        keyword: str | None = None,
+    ) -> tuple[int, list[Department]]:
         query = db.query(Department)
         if keyword:
             query = query.filter(Department.name.ilike(f"%{keyword}%"))
@@ -22,7 +21,7 @@ class CRUDDepartment(CRUDBase[Department, DepartmentCreate, DepartmentUpdate]):
         items = query.offset(skip).limit(limit).all()
         return total, items
 
-    def get_tree(self, db: Session) -> List[Department]:
+    def get_tree(self, db: Session) -> list[Department]:
         """获取所有部门（前端自行组装树或后端递归）"""
         return db.query(Department).all()
 

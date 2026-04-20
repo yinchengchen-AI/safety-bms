@@ -2,16 +2,18 @@
 """
 API 验证测试脚本 — 验证批次 1/2 修复点
 """
-import sys
-import requests
+
 import concurrent.futures
-from datetime import date, timedelta
 import uuid
+from datetime import date, timedelta
+
+import requests
 
 BASE_URL = "http://localhost:8000/api/v1"
 ADMIN_USER = {"username": "admin", "password": "Admin@123456"}
 
 session = requests.Session()
+
 
 def login():
     r = session.post(f"{BASE_URL}/auth/login", json=ADMIN_USER)
@@ -56,7 +58,10 @@ SERVICE_TYPE_ID = None
 
 
 def _db_conn():
-    import psycopg2, os
+    import os
+
+    import psycopg2
+
     return psycopg2.connect(
         host=os.getenv("DB_HOST", "localhost"),
         port=os.getenv("DB_PORT", "5432"),
@@ -98,6 +103,7 @@ def ensure_test_template() -> int:
 
     # 创建一个最小 docx 文件
     from docx import Document
+
     doc = Document()
     doc.add_paragraph("合同编号：{{contract_no}}")
     doc.add_paragraph("客户名称：{{customer_name}}")
@@ -122,7 +128,13 @@ def ensure_test_template() -> int:
     with open(doc_path, "rb") as f:
         upload_r = session.post(
             f"{BASE_URL}/contract-templates/{template_id}/upload",
-            files={"file": ("test_contract_template.docx", f, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")},
+            files={
+                "file": (
+                    "test_contract_template.docx",
+                    f,
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                )
+            },
         )
     assert upload_r.status_code == 200, f"上传测试模板文件失败: {upload_r.text}"
     return template_id

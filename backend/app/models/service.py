@@ -1,8 +1,9 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Numeric, Enum as SAEnum, Date
+from sqlalchemy import Column, Date, ForeignKey, Integer, Numeric, String, Text
+from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import relationship
 
-from app.db.base import Base, TimestampMixin
 from app.core.constants import ServiceOrderStatus
+from app.db.base import Base, TimestampMixin
 
 
 class ServiceOrder(Base, TimestampMixin):
@@ -11,7 +12,9 @@ class ServiceOrder(Base, TimestampMixin):
     id = Column(Integer, primary_key=True, index=True)
     order_no = Column(String(50), unique=True, nullable=False, index=True, comment="工单编号")
     contract_id = Column(Integer, ForeignKey("contracts.id", ondelete="RESTRICT"), nullable=False)
-    assignee_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, comment="负责人")
+    assignee_id = Column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, comment="负责人"
+    )
     title = Column(String(300), nullable=False)
     service_type = Column(
         Integer,

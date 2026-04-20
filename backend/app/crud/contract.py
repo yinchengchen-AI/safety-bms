@@ -1,15 +1,16 @@
-from typing import List, Optional, Tuple
+from datetime import UTC
 from decimal import Decimal
-from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import func
 
+from sqlalchemy import func
+from sqlalchemy.orm import Session, joinedload
+
+from app.core.constants import ContractStatus, InvoiceStatus
+from app.core.exceptions import ContractStatusError
 from app.crud.base import CRUDBase
 from app.models.contract import Contract, ContractChange, ContractTemplate
 from app.models.invoice import Invoice
 from app.models.payment import Payment
-from app.schemas.contract import ContractCreate, ContractUpdate, ContractTemplateCreate
-from app.core.constants import ContractStatus, InvoiceStatus
-from app.core.exceptions import ContractStatusError
+from app.schemas.contract import ContractCreate, ContractTemplateCreate, ContractUpdate
 
 ALLOWED_TRANSITIONS = {
     ContractStatus.DRAFT: {ContractStatus.REVIEW, ContractStatus.TERMINATED},
@@ -41,10 +42,10 @@ class CRUDContract(CRUDBase[Contract, ContractCreate, ContractUpdate]):
         *,
         skip: int = 0,
         limit: int = 20,
-        customer_id: Optional[int] = None,
-        status: Optional[ContractStatus] = None,
-        keyword: Optional[str] = None,
-    ) -> Tuple[int, List[Contract]]:
+        customer_id: int | None = None,
+        status: ContractStatus | None = None,
+        keyword: str | None = None,
+    ) -> tuple[int, list[Contract]]:
         query = db.query(Contract).filter(Contract.is_deleted == False)
         if customer_id:
             query = query.filter(Contract.customer_id == customer_id)
@@ -76,9 +77,7 @@ class CRUDContract(CRUDBase[Contract, ContractCreate, ContractUpdate]):
     ) -> Contract:
         old_status = db_obj.status
         if new_status not in ALLOWED_TRANSITIONS.get(old_status, set()):
-            raise ContractStatusError(
-                f"状态不允许从 {old_status.value} 变更为 {new_status.value}"
-            )
+            raise ContractStatusError(f"状态不允许从 {old_status.value} 变更为 {new_status.value}")
         db_obj.status = new_status
         change = ContractChange(
             contract_id=db_obj.id,
@@ -111,12 +110,12 @@ class CRUDContract(CRUDBase[Contract, ContractCreate, ContractUpdate]):
         return Decimal(str(result))
 
     def soft_delete(self, db: Session, *, contract_id: int) -> None:
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         contract = db.query(Contract).get(contract_id)
         if contract:
             contract.is_deleted = True
-            contract.deleted_at = datetime.now(timezone.utc)
+            contract.deleted_at = datetime.now(UTC)
             db.commit()
 
 

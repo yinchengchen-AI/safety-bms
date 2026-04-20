@@ -1,13 +1,12 @@
-from typing import Optional
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.dependencies import get_current_user
-from app.models.user import User
 from app.models.notification import Notification
+from app.models.user import User
+from app.schemas.common import PageResponse, ResponseMsg
 from app.schemas.notification import NotificationOut
-from app.schemas.common import ResponseMsg, PageResponse
 from app.utils.pagination import make_page_response
 
 router = APIRouter(prefix="/notifications", tags=["通知中心"])
@@ -17,7 +16,7 @@ router = APIRouter(prefix="/notifications", tags=["通知中心"])
 def list_notifications(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=200),
-    is_read: Optional[bool] = None,
+    is_read: bool | None = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -26,12 +25,7 @@ def list_notifications(
     if is_read is not None:
         query = query.filter(Notification.is_read == is_read)
     total = query.count()
-    items = (
-        query.order_by(Notification.created_at.desc())
-        .offset(skip)
-        .limit(page_size)
-        .all()
-    )
+    items = query.order_by(Notification.created_at.desc()).offset(skip).limit(page_size).all()
     return make_page_response(total, items, page, page_size)
 
 
@@ -41,10 +35,14 @@ def mark_as_read(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    notification = db.query(Notification).filter(
-        Notification.id == notification_id,
-        Notification.user_id == current_user.id,
-    ).first()
+    notification = (
+        db.query(Notification)
+        .filter(
+            Notification.id == notification_id,
+            Notification.user_id == current_user.id,
+        )
+        .first()
+    )
     if notification:
         notification.is_read = True
         db.commit()
@@ -69,10 +67,14 @@ def get_unread_count(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    count = db.query(Notification).filter(
-        Notification.user_id == current_user.id,
-        Notification.is_read == False,
-    ).count()
+    count = (
+        db.query(Notification)
+        .filter(
+            Notification.user_id == current_user.id,
+            Notification.is_read == False,
+        )
+        .count()
+    )
     return {"count": count}
 
 
@@ -94,10 +96,14 @@ def delete_notification(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    notification = db.query(Notification).filter(
-        Notification.id == notification_id,
-        Notification.user_id == current_user.id,
-    ).first()
+    notification = (
+        db.query(Notification)
+        .filter(
+            Notification.id == notification_id,
+            Notification.user_id == current_user.id,
+        )
+        .first()
+    )
     if notification:
         db.delete(notification)
         db.commit()

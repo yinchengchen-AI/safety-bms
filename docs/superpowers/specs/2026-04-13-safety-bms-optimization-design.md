@@ -126,4 +126,3 @@
 | 移除 localStorage 后某些边缘场景（如无痕模式）失效 | Cookie + Session 在无脑模式下本就无法持久化，与 localStorage 行为一致，无额外风险 |
 | 移除 `Authorization` Header 后，若后端 Cookie 解析有 bug，前端全部 401 | 已在 `api_validation_tests.py` 中覆盖 Cookie 认证；修改后先跑端到端测试再合入 |
 | `get_overdue_contracts` 批量查询改写错误导致金额计算偏差 | 保持旧逻辑作为对照，或编写单元测试断言同数据集下新旧函数结果一致 |
-

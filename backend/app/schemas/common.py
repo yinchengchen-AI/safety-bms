@@ -1,14 +1,15 @@
-from typing import Generic, List, Optional, TypeVar
+from typing import TypeVar
+
 from pydantic import BaseModel
 
 T = TypeVar("T")
 
 
-class PageResponse(BaseModel, Generic[T]):
+class PageResponse[T](BaseModel):
     total: int
     page: int
     page_size: int
-    items: List[T]
+    items: list[T]
 
 
 class Token(BaseModel):

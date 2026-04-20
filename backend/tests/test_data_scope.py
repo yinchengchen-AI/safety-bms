@@ -1,14 +1,15 @@
 import pytest
 from sqlalchemy.orm import Session
-from app.db.session import SessionLocal
+
+from app.core.security import get_password_hash
 from app.db.base_all import Base  # noqa: F401
-from app.models.user import User, Role, DataScope
-from app.models.customer import Customer
+from app.db.session import SessionLocal
 from app.models.contract import Contract
-from app.models.service import ServiceOrder
+from app.models.customer import Customer
 from app.models.invoice import Invoice
 from app.models.payment import Payment
-from app.core.security import get_password_hash
+from app.models.service import ServiceOrder
+from app.models.user import DataScope, Role, User
 from app.utils.data_scope import apply_data_scope, check_data_scope, resolve_data_scope
 
 
@@ -55,6 +56,7 @@ def _create_customer(created_by: int, dept_id: int | None = None):
 def _get_or_create_service_type_id() -> int:
     db = _make_db()
     from app.models.service_type import ServiceType as ServiceTypeModel
+
     st = db.query(ServiceTypeModel).filter(ServiceTypeModel.is_active == True).first()
     if st:
         db.close()
@@ -69,7 +71,8 @@ def _get_or_create_service_type_id() -> int:
 
 def _create_contract(created_by: int, customer_id: int, total_amount: float = 10000):
     db = _make_db()
-    from app.core.constants import ContractStatus, PaymentPlan
+    from app.core.constants import ContractStatus
+
     c = Contract(
         contract_no=f"C-{created_by}-{customer_id}",
         title="Test Contract",
@@ -89,6 +92,7 @@ def _create_contract(created_by: int, customer_id: int, total_amount: float = 10
 def _create_service_order(contract_id: int, assignee_id: int | None = None):
     db = _make_db()
     from app.core.constants import ServiceOrderStatus
+
     o = ServiceOrder(
         order_no=f"S-{contract_id}",
         contract_id=contract_id,
@@ -107,6 +111,7 @@ def _create_service_order(contract_id: int, assignee_id: int | None = None):
 def _create_invoice(contract_id: int, applied_by: int, amount: float = 1000):
     db = _make_db()
     from app.core.constants import InvoiceType
+
     i = Invoice(
         invoice_no=f"I-{contract_id}",
         contract_id=contract_id,
@@ -123,8 +128,10 @@ def _create_invoice(contract_id: int, applied_by: int, amount: float = 1000):
 
 def _create_payment(contract_id: int, created_by: int, amount: float = 500):
     db = _make_db()
-    from app.core.constants import PaymentMethod
     from datetime import date
+
+    from app.core.constants import PaymentMethod
+
     p = Payment(
         payment_no=f"P-{contract_id}",
         contract_id=contract_id,
@@ -173,13 +180,31 @@ class TestResolveDataScope:
 
 
 class TestApplyDataScope:
-    @pytest.mark.parametrize("model_factory,query_model", [
-        (lambda uid: _create_customer(uid), Customer),
-        (lambda uid: _create_contract(uid, _create_customer(uid).id), Contract),
-        (lambda uid: _create_service_order(_create_contract(uid, _create_customer(uid).id).id, uid), ServiceOrder),
-        (lambda uid: _create_invoice(_create_contract(uid, _create_customer(uid).id).id, uid), Invoice),
-        (lambda uid: _create_payment(_create_contract(uid, _create_customer(uid).id).id, uid), Payment),
-    ])
+    @pytest.mark.parametrize(
+        "model_factory,query_model",
+        [
+            (lambda uid: _create_customer(uid), Customer),
+            (lambda uid: _create_contract(uid, _create_customer(uid).id), Contract),
+            (
+                lambda uid: _create_service_order(
+                    _create_contract(uid, _create_customer(uid).id).id, uid
+                ),
+                ServiceOrder,
+            ),
+            (
+                lambda uid: _create_invoice(
+                    _create_contract(uid, _create_customer(uid).id).id, uid
+                ),
+                Invoice,
+            ),
+            (
+                lambda uid: _create_payment(
+                    _create_contract(uid, _create_customer(uid).id).id, uid
+                ),
+                Payment,
+            ),
+        ],
+    )
     def test_all_scope_returns_all(self, model_factory, query_model):
         owner = _create_user("all_owner", DataScope.ALL)
         other = _create_user("all_other", DataScope.ALL)
@@ -192,13 +217,34 @@ class TestApplyDataScope:
         assert count >= 2
         db.close()
 
-    @pytest.mark.parametrize("model_factory,query_model,attr", [
-        (lambda uid: _create_customer(uid), Customer, "created_by"),
-        (lambda uid: _create_contract(uid, _create_customer(uid).id), Contract, "created_by"),
-        (lambda uid: _create_service_order(_create_contract(uid, _create_customer(uid).id).id, uid), ServiceOrder, "assignee_id"),
-        (lambda uid: _create_invoice(_create_contract(uid, _create_customer(uid).id).id, uid), Invoice, "applied_by"),
-        (lambda uid: _create_payment(_create_contract(uid, _create_customer(uid).id).id, uid), Payment, "created_by"),
-    ])
+    @pytest.mark.parametrize(
+        "model_factory,query_model,attr",
+        [
+            (lambda uid: _create_customer(uid), Customer, "created_by"),
+            (lambda uid: _create_contract(uid, _create_customer(uid).id), Contract, "created_by"),
+            (
+                lambda uid: _create_service_order(
+                    _create_contract(uid, _create_customer(uid).id).id, uid
+                ),
+                ServiceOrder,
+                "assignee_id",
+            ),
+            (
+                lambda uid: _create_invoice(
+                    _create_contract(uid, _create_customer(uid).id).id, uid
+                ),
+                Invoice,
+                "applied_by",
+            ),
+            (
+                lambda uid: _create_payment(
+                    _create_contract(uid, _create_customer(uid).id).id, uid
+                ),
+                Payment,
+                "created_by",
+            ),
+        ],
+    )
     def test_self_scope_filters_to_user(self, model_factory, query_model, attr):
         owner = _create_user("self_owner", DataScope.SELF)
         other = _create_user("self_other", DataScope.SELF)
@@ -212,14 +258,37 @@ class TestApplyDataScope:
             assert getattr(r, attr) == owner.id
         db.close()
 
-    @pytest.mark.parametrize("model_factory,query_model,attr", [
-        (lambda uid: _create_customer(uid), Customer, "created_by"),
-        (lambda uid: _create_contract(uid, _create_customer(uid).id), Contract, "created_by"),
-        (lambda uid: _create_service_order(_create_contract(uid, _create_customer(uid).id).id, uid), ServiceOrder, "assignee_id"),
-        (lambda uid: _create_invoice(_create_contract(uid, _create_customer(uid).id).id, uid), Invoice, "applied_by"),
-        (lambda uid: _create_payment(_create_contract(uid, _create_customer(uid).id).id, uid), Payment, "created_by"),
-    ])
-    def test_dept_scope_without_department_falls_back_to_self(self, model_factory, query_model, attr):
+    @pytest.mark.parametrize(
+        "model_factory,query_model,attr",
+        [
+            (lambda uid: _create_customer(uid), Customer, "created_by"),
+            (lambda uid: _create_contract(uid, _create_customer(uid).id), Contract, "created_by"),
+            (
+                lambda uid: _create_service_order(
+                    _create_contract(uid, _create_customer(uid).id).id, uid
+                ),
+                ServiceOrder,
+                "assignee_id",
+            ),
+            (
+                lambda uid: _create_invoice(
+                    _create_contract(uid, _create_customer(uid).id).id, uid
+                ),
+                Invoice,
+                "applied_by",
+            ),
+            (
+                lambda uid: _create_payment(
+                    _create_contract(uid, _create_customer(uid).id).id, uid
+                ),
+                Payment,
+                "created_by",
+            ),
+        ],
+    )
+    def test_dept_scope_without_department_falls_back_to_self(
+        self, model_factory, query_model, attr
+    ):
         owner = _create_user("dept_nofallback", DataScope.DEPT)
         other = _create_user("dept_nofallback_other", DataScope.DEPT)
         model_factory(owner.id)

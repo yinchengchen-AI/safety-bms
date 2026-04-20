@@ -1,26 +1,28 @@
 from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.orm import Session
 
-from app.db.session import get_db
-from app.schemas.user import UserLogin, UserOut
-from app.schemas.common import Token, ResponseMsg
-from app.services.auth_service import auth_service, REFRESH_TOKEN_PREFIX
-from app.dependencies import get_current_user, get_token_from_request, get_current_user_permissions
-from app.models.user import User
 from app.config import settings
-from app.core.rate_limit import rate_limit
-from app.utils.redis_client import get_redis_client
 from app.core.exceptions import BusinessError
+from app.core.rate_limit import rate_limit
 from app.crud.user import crud_user
+from app.db.session import get_db
+from app.dependencies import get_current_user, get_current_user_permissions, get_token_from_request
+from app.models.user import User
+from app.schemas.common import ResponseMsg, Token
+from app.schemas.user import UserLogin, UserOut
+from app.services.auth_service import REFRESH_TOKEN_PREFIX, auth_service
+from app.utils.redis_client import get_redis_client
 
 router = APIRouter(prefix="/auth", tags=["认证"])
 
 
-def _set_auth_cookies(response: Response, access_token: str, refresh_token: str | None = None) -> None:
+def _set_auth_cookies(
+    response: Response, access_token: str, refresh_token: str | None = None
+) -> None:
     """设置 httpOnly、Secure、SameSite=Strict Cookie"""
     cookie_kwargs = {
         "httponly": True,
-        "secure": False if settings.DEBUG else True,
+        "secure": not settings.DEBUG,
         "samesite": "lax" if settings.DEBUG else "strict",
         "max_age": settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
     }
@@ -30,7 +32,7 @@ def _set_auth_cookies(response: Response, access_token: str, refresh_token: str 
             key="refresh_token",
             value=refresh_token,
             httponly=True,
-            secure=False if settings.DEBUG else True,
+            secure=not settings.DEBUG,
             samesite="lax" if settings.DEBUG else "strict",
             max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 86400,
         )

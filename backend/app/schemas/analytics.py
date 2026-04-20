@@ -1,5 +1,4 @@
 from datetime import date
-from typing import Optional
 
 from pydantic import BaseModel
 
@@ -26,7 +25,7 @@ class RevenueTrendOut(BaseModel):
 
 
 class PerformanceRankingItemOut(BaseModel):
-    user_id: Optional[int] = None
+    user_id: int | None = None
     full_name: str
     signed_amount: float
     invoiced_amount: float
@@ -46,8 +45,8 @@ class ReceivableAgingBucketOut(BaseModel):
 class RiskContractOut(BaseModel):
     contract_id: int
     contract_no: str
-    customer_name: Optional[str] = None
-    end_date: Optional[date] = None
+    customer_name: str | None = None
+    end_date: date | None = None
     receivable_amount: float
     overdue_days: int
 
@@ -100,11 +99,11 @@ class AnalyticsDrilldownItemOut(BaseModel):
     id: int
     category: str
     primary_label: str
-    secondary_label: Optional[str] = None
-    amount: Optional[float] = None
-    date_label: Optional[str] = None
-    status: Optional[str] = None
-    extra: Optional[str] = None
+    secondary_label: str | None = None
+    amount: float | None = None
+    date_label: str | None = None
+    status: str | None = None
+    extra: str | None = None
 
 
 class AnalyticsDrilldownOut(BaseModel):

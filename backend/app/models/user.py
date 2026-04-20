@@ -1,6 +1,7 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Enum
-from sqlalchemy.orm import relationship
 import enum
+
+from sqlalchemy import Boolean, Column, DateTime, Enum, ForeignKey, Integer, String
+from sqlalchemy.orm import relationship
 
 from app.db.base import Base, TimestampMixin
 
@@ -20,7 +21,9 @@ class UserRole(Base):
 class RolePermission(Base):
     __tablename__ = "role_permissions"
     role_id = Column(Integer, ForeignKey("roles.id", ondelete="CASCADE"), primary_key=True)
-    permission_id = Column(Integer, ForeignKey("permissions.id", ondelete="CASCADE"), primary_key=True)
+    permission_id = Column(
+        Integer, ForeignKey("permissions.id", ondelete="CASCADE"), primary_key=True
+    )
 
 
 class Permission(Base, TimestampMixin):
@@ -40,7 +43,9 @@ class Role(Base, TimestampMixin):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(50), unique=True, nullable=False, index=True)
     description = Column(String(200))
-    data_scope = Column(Enum(DataScope), default=DataScope.SELF, nullable=False, comment="数据权限范围")
+    data_scope = Column(
+        Enum(DataScope), default=DataScope.SELF, nullable=False, comment="数据权限范围"
+    )
 
     users = relationship("User", secondary="user_roles", back_populates="roles")
     permissions = relationship("Permission", secondary="role_permissions", back_populates="roles")
@@ -59,11 +64,18 @@ class User(Base, TimestampMixin):
     phone = Column(String(20))
     avatar_url = Column(String(500))
     last_login_at = Column(DateTime(timezone=True))
-    department_id = Column(Integer, ForeignKey("departments.id", ondelete="SET NULL"), nullable=True, comment="所属部门ID")
+    department_id = Column(
+        Integer,
+        ForeignKey("departments.id", ondelete="SET NULL"),
+        nullable=True,
+        comment="所属部门ID",
+    )
 
     roles = relationship("Role", secondary="user_roles", back_populates="users")
     department = relationship("Department", back_populates="users")
     # 服务工单分配
-    service_orders = relationship("ServiceOrder", back_populates="assignee", foreign_keys="ServiceOrder.assignee_id")
+    service_orders = relationship(
+        "ServiceOrder", back_populates="assignee", foreign_keys="ServiceOrder.assignee_id"
+    )
     # 跟进记录
     follow_ups = relationship("CustomerFollowUp", back_populates="creator")

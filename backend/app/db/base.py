@@ -1,6 +1,7 @@
+from datetime import UTC, datetime
+
+from sqlalchemy import Boolean, Column, DateTime
 from sqlalchemy.orm import DeclarativeBase
-from sqlalchemy import Column, Integer, DateTime, Boolean
-from datetime import datetime, timezone
 
 
 class Base(DeclarativeBase):
@@ -8,11 +9,11 @@ class Base(DeclarativeBase):
 
 
 class TimestampMixin:
-    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False)
     updated_at = Column(
         DateTime(timezone=True),
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
         nullable=False,
     )
 

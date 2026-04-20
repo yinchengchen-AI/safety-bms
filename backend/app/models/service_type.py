@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Numeric, Text, Boolean, ForeignKey
+from sqlalchemy import Boolean, Column, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.orm import relationship
 
 from app.db.base import Base, TimestampMixin
@@ -21,4 +21,6 @@ class ServiceType(Base, TimestampMixin):
     )
     is_active = Column(Boolean, default=True, nullable=False, comment="是否启用")
 
-    default_contract_template = relationship("ContractTemplate", foreign_keys=[default_contract_template_id])
+    default_contract_template = relationship(
+        "ContractTemplate", foreign_keys=[default_contract_template_id]
+    )

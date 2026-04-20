@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List
+
 from pydantic import BaseModel
 
 
@@ -16,4 +16,4 @@ class NotificationOut(BaseModel):
 
 
 class NotificationListOut(BaseModel):
-    items: List[NotificationOut]
+    items: list[NotificationOut]

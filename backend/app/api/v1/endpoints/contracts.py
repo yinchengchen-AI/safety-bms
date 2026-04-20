@@ -1,28 +1,39 @@
-from typing import Optional
-from datetime import datetime, timezone
+import contextlib
+import logging
+from datetime import UTC, datetime
+
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from app.db.session import get_db
-from app.schemas.contract import (
-    ContractCreate, ContractUpdate, ContractOut, ContractListOut, ContractStatusUpdate,
-    ContractSignRequest, ContractUploadSignedRequest,
-)
-from app.schemas.common import PageResponse, ResponseMsg
-from app.crud.contract import crud_contract
-from app.dependencies import require_permissions
-from app.core.exceptions import NotFoundError, DuplicateError, PermissionDeniedError, BusinessError
 from app.core.constants import ContractStatus, PermissionCode
-from app.models.contract import Contract, ContractTemplate, ContractSignature, ContractChange
+from app.core.exceptions import BusinessError, DuplicateError, NotFoundError, PermissionDeniedError
+from app.crud.contract import crud_contract
+from app.db.session import get_db
+from app.dependencies import require_permissions
+from app.models.contract import Contract, ContractChange, ContractSignature, ContractTemplate
 from app.models.user import User
+from app.schemas.common import PageResponse, ResponseMsg
+from app.schemas.contract import (
+    ContractCreate,
+    ContractListOut,
+    ContractOut,
+    ContractSignRequest,
+    ContractStatusUpdate,
+    ContractUpdate,
+    ContractUploadSignedRequest,
+)
+from app.services.contract_doc_service import (
+    insert_signatures_and_to_pdf,
+    render_contract_draft,
+    render_standard_contract_draft,
+    save_base64_signature_to_minio,
+)
 from app.services.minio_service import minio_service
-import logging
-from app.services.contract_doc_service import render_contract_draft, render_standard_contract_draft, insert_signatures_and_to_pdf, save_base64_signature_to_minio
 from app.services.notification_service import notification_service
 from app.utils.data_scope import apply_data_scope, check_data_scope
-from app.utils.pagination import make_page_response
 from app.utils.excel_export import export_excel_response
 from app.utils.export_mappings import CONTRACT_STATUS_MAP, map_value
+from app.utils.pagination import make_page_response
 
 router = APIRouter(prefix="/contracts", tags=["合同管理"])
 
@@ -54,9 +65,9 @@ def _enrich_contract_list_out(contract, out: ContractListOut) -> ContractListOut
 def list_contracts(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=200),
-    customer_id: Optional[int] = None,
-    status: Optional[ContractStatus] = None,
-    keyword: Optional[str] = None,
+    customer_id: int | None = None,
+    status: ContractStatus | None = None,
+    keyword: str | None = None,
     current_user: User = Depends(require_permissions(PermissionCode.CONTRACT_READ)),
     db: Session = Depends(get_db),
 ):
@@ -72,12 +83,7 @@ def list_contracts(
         )
     query = apply_data_scope(query, Contract, current_user)
     total = query.count()
-    items = (
-        query.order_by(Contract.created_at.desc())
-        .offset(skip)
-        .limit(page_size)
-        .all()
-    )
+    items = query.order_by(Contract.created_at.desc()).offset(skip).limit(page_size).all()
     # 附加 customer_name
     result = []
     for c in items:
@@ -89,9 +95,9 @@ def list_contracts(
 
 @router.get("/export")
 def export_contracts(
-    customer_id: Optional[int] = None,
-    status: Optional[ContractStatus] = None,
-    keyword: Optional[str] = None,
+    customer_id: int | None = None,
+    status: ContractStatus | None = None,
+    keyword: str | None = None,
     current_user: User = Depends(require_permissions(PermissionCode.CONTRACT_READ)),
     db: Session = Depends(get_db),
 ):
@@ -101,22 +107,42 @@ def export_contracts(
     if status:
         query = query.filter(Contract.status == status)
     if keyword:
-        query = query.filter((Contract.title.ilike(f"%{keyword}%")) | (Contract.contract_no.ilike(f"%{keyword}%")))
+        query = query.filter(
+            (Contract.title.ilike(f"%{keyword}%")) | (Contract.contract_no.ilike(f"%{keyword}%"))
+        )
     query = apply_data_scope(query, Contract, current_user)
     items = query.order_by(Contract.created_at.desc()).all()
-    headers = ["合同编号", "标题", "客户名称", "服务类型", "总金额", "签订日期", "开始日期", "结束日期", "状态"]
+    headers = [
+        "合同编号",
+        "标题",
+        "客户名称",
+        "服务类型",
+        "总金额",
+        "签订日期",
+        "开始日期",
+        "结束日期",
+        "状态",
+    ]
     rows = []
     for c in items:
-        rows.append([
-            c.contract_no, c.title, c.customer.name if c.customer else "",
-            c.service_type_obj.name if c.service_type_obj else "", str(c.total_amount) if c.total_amount is not None else "",
-            c.sign_date.strftime("%Y-%m-%d") if c.sign_date else "",
-            c.start_date.strftime("%Y-%m-%d") if c.start_date else "",
-            c.end_date.strftime("%Y-%m-%d") if c.end_date else "",
-            map_value(c.status.value if c.status else "", CONTRACT_STATUS_MAP),
-        ])
+        rows.append(
+            [
+                c.contract_no,
+                c.title,
+                c.customer.name if c.customer else "",
+                c.service_type_obj.name if c.service_type_obj else "",
+                str(c.total_amount) if c.total_amount is not None else "",
+                c.sign_date.strftime("%Y-%m-%d") if c.sign_date else "",
+                c.start_date.strftime("%Y-%m-%d") if c.start_date else "",
+                c.end_date.strftime("%Y-%m-%d") if c.end_date else "",
+                map_value(c.status.value if c.status else "", CONTRACT_STATUS_MAP),
+            ]
+        )
     from datetime import datetime
-    return export_excel_response(f"contracts_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx", headers, rows)
+
+    return export_excel_response(
+        f"contracts_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx", headers, rows
+    )
 
 
 @router.post("", response_model=ContractOut, status_code=201)
@@ -161,7 +187,11 @@ def update_contract(
     if contract.status in (ContractStatus.REVIEW, ContractStatus.ACTIVE, ContractStatus.SIGNED):
         raise BusinessError(f"{contract.status.value} 状态合同不可修改")
     if body.contract_no:
-        existing = db.query(Contract).filter(Contract.contract_no == body.contract_no).first()
+        existing = (
+            db.query(Contract)
+            .filter(Contract.contract_no == body.contract_no, Contract.is_deleted == False)
+            .first()
+        )
         if existing and existing.id != contract_id:
             raise DuplicateError("合同编号")
     return crud_contract.update(db, db_obj=contract, obj_in=body)
@@ -183,7 +213,11 @@ def update_contract_status(
     # 提交审核时自动生草稿并校验模板
     if body.status == ContractStatus.REVIEW and old_status == ContractStatus.DRAFT:
         if contract.template_id:
-            template = db.query(ContractTemplate).filter(ContractTemplate.id == contract.template_id).first()
+            template = (
+                db.query(ContractTemplate)
+                .filter(ContractTemplate.id == contract.template_id)
+                .first()
+            )
             if not template or not template.file_url:
                 raise BusinessError("模板文件不存在")
             draft_object_name = render_contract_draft(contract, template.file_url)
@@ -196,13 +230,19 @@ def update_contract_status(
             except Exception:
                 logging.getLogger(__name__).exception("标准合同草稿生成失败，不影响审核提交")
     updated = crud_contract.update_status(
-        db, db_obj=contract, new_status=body.status, changed_by=current_user.id, remark=body.remark or ""
+        db,
+        db_obj=contract,
+        new_status=body.status,
+        changed_by=current_user.id,
+        remark=body.remark or "",
     )
     creator = db.query(User).filter(User.id == contract.created_by).first()
     customer_name = contract.customer.name if contract.customer else ""
     customer_line = f"客户：{customer_name}\n" if customer_name else ""
     if creator and creator.id != current_user.id:
-        total_str = format(contract.total_amount, ".2f") if contract.total_amount is not None else "0.00"
+        total_str = (
+            format(contract.total_amount, ".2f") if contract.total_amount is not None else "0.00"
+        )
         if body.status == ContractStatus.ACTIVE:
             notification_service.create(
                 db,
@@ -227,7 +267,9 @@ def update_contract_status(
                 ).strip(),
             )
     if creator and body.status == ContractStatus.TERMINATED:
-        total_str = format(contract.total_amount, ".2f") if contract.total_amount is not None else "0.00"
+        total_str = (
+            format(contract.total_amount, ".2f") if contract.total_amount is not None else "0.00"
+        )
         notification_service.create(
             db,
             user_id=creator.id,
@@ -274,7 +316,9 @@ def generate_contract_draft(
     if not contract.template_id:
         raise BusinessError("该合同未选择模板，无法生成草稿")
 
-    template = db.query(ContractTemplate).filter(ContractTemplate.id == contract.template_id).first()
+    template = (
+        db.query(ContractTemplate).filter(ContractTemplate.id == contract.template_id).first()
+    )
     if not template or not template.file_url:
         raise BusinessError("模板文件不存在")
 
@@ -331,7 +375,7 @@ def sign_contract(
         )
 
         old_status = contract.status.value
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # 自动填充签订日期
         update_fields: dict = {
@@ -389,15 +433,11 @@ def sign_contract(
     except Exception:
         # 清理已上传的临时签名图片
         if party_a_object_name:
-            try:
+            with contextlib.suppress(Exception):
                 minio_service.delete_file(party_a_object_name)
-            except Exception:
-                pass
         if party_b_object_name:
-            try:
+            with contextlib.suppress(Exception):
                 minio_service.delete_file(party_b_object_name)
-            except Exception:
-                pass
         raise
 
 
@@ -460,7 +500,7 @@ def upload_signed_contract(
         raise BusinessError("合同草稿不存在，无法确认签订")
 
     old_status = contract.status.value
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     update_fields = {
         "status": ContractStatus.SIGNED,
         "signed_at": now,

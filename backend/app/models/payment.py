@@ -1,8 +1,9 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Numeric, Enum as SAEnum, Date, Boolean
+from sqlalchemy import Boolean, Column, Date, ForeignKey, Integer, Numeric, String, Text
+from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import relationship
 
-from app.db.base import Base, TimestampMixin
 from app.core.constants import PaymentMethod
+from app.db.base import Base, TimestampMixin
 
 
 class Payment(Base, TimestampMixin):
@@ -11,7 +12,12 @@ class Payment(Base, TimestampMixin):
     id = Column(Integer, primary_key=True, index=True)
     payment_no = Column(String(50), unique=True, nullable=False, index=True, comment="收款流水号")
     contract_id = Column(Integer, ForeignKey("contracts.id", ondelete="RESTRICT"), nullable=False)
-    invoice_id = Column(Integer, ForeignKey("invoices.id", ondelete="SET NULL"), nullable=True, comment="关联发票（可选）")
+    invoice_id = Column(
+        Integer,
+        ForeignKey("invoices.id", ondelete="SET NULL"),
+        nullable=True,
+        comment="关联发票（可选）",
+    )
     amount = Column(Numeric(15, 2), nullable=False, comment="收款金额")
     payment_method = Column(
         SAEnum(PaymentMethod, name="payment_method"),

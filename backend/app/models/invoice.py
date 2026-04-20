@@ -1,15 +1,18 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Numeric, Enum as SAEnum, Date
+from sqlalchemy import Column, Date, ForeignKey, Integer, Numeric, String, Text
+from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import relationship
 
+from app.core.constants import InvoiceStatus, InvoiceType
 from app.db.base import Base, TimestampMixin
-from app.core.constants import InvoiceType, InvoiceStatus
 
 
 class Invoice(Base, TimestampMixin):
     __tablename__ = "invoices"
 
     id = Column(Integer, primary_key=True, index=True)
-    invoice_no = Column(String(50), unique=True, nullable=False, index=True, comment="发票编号（内部流水号）")
+    invoice_no = Column(
+        String(50), unique=True, nullable=False, index=True, comment="发票编号（内部流水号）"
+    )
     contract_id = Column(Integer, ForeignKey("contracts.id", ondelete="RESTRICT"), nullable=False)
     invoice_type = Column(
         SAEnum(InvoiceType, name="invoice_type"),

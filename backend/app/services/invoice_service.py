@@ -2,17 +2,17 @@ from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
-from app.crud.invoice import crud_invoice
+from app.core.constants import ContractStatus, InvoiceStatus
 from app.core.exceptions import (
+    BusinessError,
+    ContractStatusError,
     InvoiceAmountExceededError,
     NotFoundError,
-    ContractStatusError,
-    BusinessError,
 )
-from app.core.constants import ContractStatus, InvoiceStatus
-from app.schemas.invoice import InvoiceCreate, InvoiceAuditRequest
-from app.models.invoice import Invoice
+from app.crud.invoice import crud_invoice
 from app.models.contract import Contract
+from app.models.invoice import Invoice
+from app.schemas.invoice import InvoiceAuditRequest, InvoiceCreate
 
 
 def _decimal_attr(obj: object, field: str) -> Decimal:
@@ -24,15 +24,10 @@ def _int_attr(obj: object, field: str) -> int:
 
 
 class InvoiceService:
-    def create_invoice(
-        self, db: Session, *, obj_in: InvoiceCreate, applied_by: int
-    ) -> Invoice:
+    def create_invoice(self, db: Session, *, obj_in: InvoiceCreate, applied_by: int) -> Invoice:
         # 1. 检查合同是否存在且生效（加锁防止竞态）
         contract = (
-            db.query(Contract)
-            .filter(Contract.id == obj_in.contract_id)
-            .with_for_update()
-            .first()
+            db.query(Contract).filter(Contract.id == obj_in.contract_id).with_for_update().first()
         )
         if not contract:
             raise NotFoundError("合同")
@@ -56,12 +51,8 @@ class InvoiceService:
 
         return crud_invoice.create(db, obj_in=obj_in, applied_by=applied_by)
 
-    def audit_invoice(
-        self, db: Session, *, invoice_id: int, body: InvoiceAuditRequest
-    ) -> Invoice:
-        invoice = (
-            db.query(Invoice).filter(Invoice.id == invoice_id).with_for_update().first()
-        )
+    def audit_invoice(self, db: Session, *, invoice_id: int, body: InvoiceAuditRequest) -> Invoice:
+        invoice = db.query(Invoice).filter(Invoice.id == invoice_id).with_for_update().first()
         if invoice is None:
             raise NotFoundError("发票")
         invoice_status = getattr(invoice, "status", None)
@@ -84,19 +75,13 @@ class InvoiceService:
                 raise NotFoundError("合同")
 
             contract_id = _int_attr(contract, "id")
-            db.query(Invoice).filter(
-                Invoice.contract_id == contract_id
-            ).with_for_update().all()
+            db.query(Invoice).filter(Invoice.contract_id == contract_id).with_for_update().all()
 
-            already_invoiced = crud_invoice.get_sum_by_contract(
-                db, contract_id=contract_id
-            )
+            already_invoiced = crud_invoice.get_sum_by_contract(db, contract_id=contract_id)
             available = _decimal_attr(contract, "total_amount") - already_invoiced
             invoice_amount = _decimal_attr(invoice, "amount")
             if invoice_amount > available:
-                raise InvoiceAmountExceededError(
-                    available=available, requested=invoice_amount
-                )
+                raise InvoiceAmountExceededError(available=available, requested=invoice_amount)
 
             return crud_invoice.update(
                 db,

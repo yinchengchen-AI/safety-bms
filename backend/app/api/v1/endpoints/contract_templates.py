@@ -1,16 +1,15 @@
-from typing import Optional
-from fastapi import APIRouter, Depends, Query, UploadFile, File
+from fastapi import APIRouter, Depends, File, Query, UploadFile
 from sqlalchemy.orm import Session
 
-from app.db.session import get_db
-from app.schemas.contract import ContractTemplateCreate, ContractTemplateOut
-from app.schemas.common import PageResponse, ResponseMsg, FileUploadResponse
-from app.crud.contract import crud_contract_template
-from app.dependencies import require_permissions
-from app.core.exceptions import NotFoundError
 from app.core.constants import PermissionCode
+from app.core.exceptions import NotFoundError
+from app.crud.contract import crud_contract_template
+from app.db.session import get_db
+from app.dependencies import require_permissions
 from app.models.contract import ContractTemplate
 from app.models.user import User
+from app.schemas.common import FileUploadResponse, PageResponse, ResponseMsg
+from app.schemas.contract import ContractTemplateCreate, ContractTemplateOut
 from app.services.minio_service import minio_service
 from app.utils.pagination import make_page_response
 
@@ -21,7 +20,7 @@ router = APIRouter(prefix="/contract-templates", tags=["合同模板"])
 def list_contract_templates(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=200),
-    service_type: Optional[int] = None,
+    service_type: int | None = None,
     current_user: User = Depends(require_permissions(PermissionCode.CONTRACT_UPDATE)),
     db: Session = Depends(get_db),
 ):
@@ -30,12 +29,7 @@ def list_contract_templates(
     if service_type:
         query = query.filter(ContractTemplate.service_type == service_type)
     total = query.count()
-    items = (
-        query.order_by(ContractTemplate.created_at.desc())
-        .offset(skip)
-        .limit(page_size)
-        .all()
-    )
+    items = query.order_by(ContractTemplate.created_at.desc()).offset(skip).limit(page_size).all()
     items_out = []
     for t in items:
         out = ContractTemplateOut.model_validate(t)

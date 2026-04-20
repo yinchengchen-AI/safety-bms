@@ -1,16 +1,16 @@
 import tempfile
+import uuid
+from datetime import date
+from decimal import Decimal
 from pathlib import Path
 from unittest.mock import patch
-from decimal import Decimal
-from datetime import date
-import uuid
 
 from docx import Document
 
-from app.services.contract_doc_service import render_standard_contract_draft
 from app.models.contract import Contract, ContractTemplate
 from app.models.customer import Customer
 from app.models.service_type import ServiceType
+from app.services.contract_doc_service import render_standard_contract_draft
 
 
 def test_render_standard_contract_draft(db_session):
@@ -23,7 +23,9 @@ def test_render_standard_contract_draft(db_session):
     unique_suffix = uuid.uuid4().hex[:8]
 
     # Seed customer
-    customer = Customer(name=f"测试甲方-{unique_suffix}", city="北京市", district="朝阳区", address="测试路1号")
+    customer = Customer(
+        name=f"测试甲方-{unique_suffix}", city="北京市", district="朝阳区", address="测试路1号"
+    )
     db_session.add(customer)
     db_session.flush()
 
@@ -60,13 +62,17 @@ def test_render_standard_contract_draft(db_session):
         doc.save(str(tpl_path))
         template_bytes = tpl_path.read_bytes()
 
-    with patch("app.services.contract_doc_service._download_minio_file", return_value=template_bytes):
-        with patch("app.services.contract_doc_service._upload_bytes_to_minio") as mock_upload:
-            result = render_standard_contract_draft(contract, db_session)
-            assert result is not None
-            assert result.startswith(f"contracts/{contract.id}/standard_drafts/")
-            assert result.endswith(".docx")
-            assert mock_upload.called
-            uploaded_bytes = mock_upload.call_args[0][0]
-            assert isinstance(uploaded_bytes, bytes)
-            assert len(uploaded_bytes) > 0
+    with (
+        patch(
+            "app.services.contract_doc_service._download_minio_file", return_value=template_bytes
+        ),
+        patch("app.services.contract_doc_service._upload_bytes_to_minio") as mock_upload,
+    ):
+        result = render_standard_contract_draft(contract, db_session)
+        assert result is not None
+        assert result.startswith(f"contracts/{contract.id}/standard_drafts/")
+        assert result.endswith(".docx")
+        assert mock_upload.called
+        uploaded_bytes = mock_upload.call_args[0][0]
+        assert isinstance(uploaded_bytes, bytes)
+        assert len(uploaded_bytes) > 0

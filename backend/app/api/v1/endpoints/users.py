@@ -1,21 +1,20 @@
-from typing import Optional
-from fastapi import APIRouter, Depends, Query, UploadFile, File
+from fastapi import APIRouter, Depends, File, Query, UploadFile
 from sqlalchemy.orm import Session
 
-from app.db.session import get_db
-from app.schemas.user import UserCreate, UserUpdate, UserOut, RoleOut, PasswordChange
-from app.schemas.common import PageResponse, ResponseMsg, FileUploadResponse
+from app.core.constants import PermissionCode
+from app.core.exceptions import BusinessError, DuplicateError, NotFoundError
+from app.core.security import get_password_hash, verify_password
 from app.crud.user import crud_user
+from app.db.session import get_db
 from app.dependencies import get_current_user, require_permissions
-from app.core.exceptions import NotFoundError, DuplicateError, BusinessError
 from app.models.user import User
-from app.utils.pagination import make_page_response
+from app.schemas.common import FileUploadResponse, PageResponse, ResponseMsg
+from app.schemas.user import PasswordChange, RoleOut, UserCreate, UserOut, UserUpdate
+from app.services.minio_service import minio_service
 from app.utils.data_scope import check_data_scope
 from app.utils.excel_export import export_excel_response
 from app.utils.export_mappings import USER_ROLE_MAP, map_value
-from app.core.constants import PermissionCode
-from app.core.security import verify_password, get_password_hash
-from app.services.minio_service import minio_service
+from app.utils.pagination import make_page_response
 
 router = APIRouter(prefix="/users", tags=["用户管理"])
 
@@ -24,8 +23,8 @@ router = APIRouter(prefix="/users", tags=["用户管理"])
 def list_users(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=200),
-    is_active: Optional[bool] = None,
-    department_id: Optional[int] = None,
+    is_active: bool | None = None,
+    department_id: int | None = None,
     _: User = Depends(require_permissions(PermissionCode.USER_READ.value)),
     db: Session = Depends(get_db),
 ):
@@ -38,9 +37,9 @@ def list_users(
 
 @router.get("/export")
 def export_users(
-    is_active: Optional[bool] = None,
-    department_id: Optional[int] = None,
-    keyword: Optional[str] = None,
+    is_active: bool | None = None,
+    department_id: int | None = None,
+    keyword: str | None = None,
     _: User = Depends(require_permissions(PermissionCode.USER_READ.value)),
     db: Session = Depends(get_db),
 ):
@@ -51,21 +50,31 @@ def export_users(
         query = query.filter(User.department_id == department_id)
     if keyword:
         query = query.filter(
-            (User.username.ilike(f"%{keyword}%")) | (User.full_name.ilike(f"%{keyword}%")) | (User.email.ilike(f"%{keyword}%"))
+            (User.username.ilike(f"%{keyword}%"))
+            | (User.full_name.ilike(f"%{keyword}%"))
+            | (User.email.ilike(f"%{keyword}%"))
         )
     items = query.order_by(User.created_at.desc()).all()
     headers = ["用户名", "姓名", "邮箱", "手机号", "部门", "状态", "角色", "创建时间"]
     rows = []
     for u in items:
-        rows.append([
-            u.username, u.full_name or "", u.email or "", u.phone or "",
-            u.department.name if u.department else "",
-            "启用" if u.is_active else "禁用",
-            ", ".join([map_value(r.name, USER_ROLE_MAP) for r in u.roles]) if u.roles else "",
-            u.created_at.strftime("%Y-%m-%d %H:%M") if u.created_at else "",
-        ])
+        rows.append(
+            [
+                u.username,
+                u.full_name or "",
+                u.email or "",
+                u.phone or "",
+                u.department.name if u.department else "",
+                "启用" if u.is_active else "禁用",
+                ", ".join([map_value(r.name, USER_ROLE_MAP) for r in u.roles]) if u.roles else "",
+                u.created_at.strftime("%Y-%m-%d %H:%M") if u.created_at else "",
+            ]
+        )
     from datetime import datetime
-    return export_excel_response(f"users_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx", headers, rows)
+
+    return export_excel_response(
+        f"users_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx", headers, rows
+    )
 
 
 @router.post("", response_model=UserOut, status_code=201)

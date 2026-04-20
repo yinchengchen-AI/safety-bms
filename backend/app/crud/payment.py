@@ -1,7 +1,7 @@
-from typing import List, Optional, Tuple
 from decimal import Decimal
-from sqlalchemy.orm import Session
+
 from sqlalchemy import func
+from sqlalchemy.orm import Session
 
 from app.crud.base import CRUDBase
 from app.models.payment import Payment
@@ -9,7 +9,9 @@ from app.schemas.payment import PaymentCreate, PaymentUpdate
 
 
 class CRUDPayment(CRUDBase[Payment, PaymentCreate, PaymentUpdate]):
-    def create(self, db: Session, *, obj_in: PaymentCreate, created_by: int | None = None) -> Payment:
+    def create(
+        self, db: Session, *, obj_in: PaymentCreate, created_by: int | None = None
+    ) -> Payment:
         db_obj = Payment(**obj_in.model_dump(), created_by=created_by)
         db.add(db_obj)
         db.commit()
@@ -22,9 +24,9 @@ class CRUDPayment(CRUDBase[Payment, PaymentCreate, PaymentUpdate]):
         *,
         skip: int = 0,
         limit: int = 20,
-        contract_id: Optional[int] = None,
-        invoice_id: Optional[int] = None,
-    ) -> Tuple[int, List[Payment]]:
+        contract_id: int | None = None,
+        invoice_id: int | None = None,
+    ) -> tuple[int, list[Payment]]:
         query = db.query(Payment)
         if contract_id:
             query = query.filter(Payment.contract_id == contract_id)
@@ -50,7 +52,9 @@ class CRUDPayment(CRUDBase[Payment, PaymentCreate, PaymentUpdate]):
         )
         return Decimal(str(result))
 
-    def get_sums_by_contract_ids(self, db: Session, *, contract_ids: List[int]) -> dict[int, Decimal]:
+    def get_sums_by_contract_ids(
+        self, db: Session, *, contract_ids: list[int]
+    ) -> dict[int, Decimal]:
         results = (
             db.query(Payment.contract_id, func.coalesce(func.sum(Payment.amount), 0).label("total"))
             .filter(Payment.contract_id.in_(contract_ids))
@@ -59,9 +63,10 @@ class CRUDPayment(CRUDBase[Payment, PaymentCreate, PaymentUpdate]):
         )
         return {r.contract_id: Decimal(str(r.total)) for r in results}
 
-    def get_monthly_stats(self, db: Session, *, year: int) -> List[dict]:
+    def get_monthly_stats(self, db: Session, *, year: int) -> list[dict]:
         """按月统计收款金额（用于折线图）"""
         from sqlalchemy import extract
+
         results = (
             db.query(
                 extract("month", Payment.payment_date).label("month"),

@@ -1,9 +1,7 @@
-from typing import Any, List
-from pydantic import BaseModel
-from app.schemas.common import PageResponse
+from typing import Any
 
 
-def make_page_response(total: int, items: List[Any], page: int, page_size: int) -> dict:
+def make_page_response(total: int, items: list[Any], page: int, page_size: int) -> dict:
     return {
         "total": total,
         "page": page,

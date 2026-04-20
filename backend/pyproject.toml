@@ -1,0 +1,39 @@
+[tool.black]
+line-length = 100
+target-version = ['py312']
+exclude = '''
+/(
+    migrations
+  | .venv
+  | venv
+  | __pycache__
+)/
+'''
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+exclude = ["migrations", ".venv", "venv", "__pycache__"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "F",   # Pyflakes
+    "I",   # isort
+    "W",   # pycodestyle warnings
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "SIM", # flake8-simplify
+]
+ignore = [
+    "E712",  # SQLAlchemy 需要 == False / == True
+    "E501",  # 由 black 处理行长度
+    "B008",  # FastAPI Depends() 在默认参数中是标准设计模式
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.isort]
+known-first-party = ["app"]

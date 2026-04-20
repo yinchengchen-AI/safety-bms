@@ -1,6 +1,5 @@
-from typing import List, Tuple, Optional
-from sqlalchemy.orm import Session
 from sqlalchemy import func
+from sqlalchemy.orm import Session
 
 from app.crud.base import CRUDBase
 from app.models.service_type import ServiceType
@@ -8,7 +7,7 @@ from app.schemas.service_type import ServiceTypeCreate, ServiceTypeUpdate
 
 
 class CRUDServiceType(CRUDBase[ServiceType, ServiceTypeCreate, ServiceTypeUpdate]):
-    def get_by_code(self, db: Session, *, code: str) -> Optional[ServiceType]:
+    def get_by_code(self, db: Session, *, code: str) -> ServiceType | None:
         return db.query(ServiceType).filter(ServiceType.code == code).first()
 
     def get_multi(
@@ -17,8 +16,8 @@ class CRUDServiceType(CRUDBase[ServiceType, ServiceTypeCreate, ServiceTypeUpdate
         *,
         skip: int = 0,
         limit: int = 20,
-        is_active: Optional[bool] = None,
-    ) -> Tuple[int, List[ServiceType]]:
+        is_active: bool | None = None,
+    ) -> tuple[int, list[ServiceType]]:
         query = db.query(ServiceType)
         if is_active is not None:
             query = query.filter(ServiceType.is_active == is_active)

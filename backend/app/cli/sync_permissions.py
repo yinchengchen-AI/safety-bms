@@ -3,21 +3,29 @@
 用法：
     PYTHONPATH=. python app/cli/sync_permissions.py
 """
+
 from sqlalchemy.orm import Session
 
-from app.db.session import SessionLocal
-from app.db.base_all import Base  # noqa: F401
 from app.core.constants import PermissionCode
+from app.db.base_all import Base  # noqa: F401
+from app.db.session import SessionLocal
 from app.models.user import Permission, Role
 
-
 PERMISSIONS = [
-    {"code": PermissionCode.CUSTOMER_READ, "name": "客户查看", "description": "查看客户列表及客户详情"},
+    {
+        "code": PermissionCode.CUSTOMER_READ,
+        "name": "客户查看",
+        "description": "查看客户列表及客户详情",
+    },
     {"code": PermissionCode.CUSTOMER_CREATE, "name": "客户创建", "description": "创建新客户信息"},
     {"code": PermissionCode.CUSTOMER_UPDATE, "name": "客户编辑", "description": "编辑客户基础资料"},
     {"code": PermissionCode.CUSTOMER_DELETE, "name": "客户删除", "description": "删除客户记录"},
     {"code": PermissionCode.CUSTOMER_EXPORT, "name": "客户导出", "description": "导出客户数据"},
-    {"code": PermissionCode.CONTRACT_READ, "name": "合同查看", "description": "查看合同列表及合同详情"},
+    {
+        "code": PermissionCode.CONTRACT_READ,
+        "name": "合同查看",
+        "description": "查看合同列表及合同详情",
+    },
     {"code": PermissionCode.CONTRACT_CREATE, "name": "合同创建", "description": "创建新合同"},
     {"code": PermissionCode.CONTRACT_UPDATE, "name": "合同编辑", "description": "编辑合同内容"},
     {"code": PermissionCode.CONTRACT_DELETE, "name": "合同删除", "description": "删除合同记录"},
@@ -53,7 +61,11 @@ PERMISSIONS = [
     {"code": PermissionCode.DEPARTMENT_UPDATE, "name": "部门编辑", "description": "编辑部门信息"},
     {"code": PermissionCode.DEPARTMENT_DELETE, "name": "部门删除", "description": "删除部门"},
     {"code": PermissionCode.DEPARTMENT_EXPORT, "name": "部门导出", "description": "导出部门数据"},
-    {"code": PermissionCode.DASHBOARD_READ, "name": "仪表盘查看", "description": "查看首页仪表盘数据"},
+    {
+        "code": PermissionCode.DASHBOARD_READ,
+        "name": "仪表盘查看",
+        "description": "查看首页仪表盘数据",
+    },
     {"code": PermissionCode.ANALYTICS_READ, "name": "分析查看", "description": "查看统计分析图表"},
     {"code": PermissionCode.REPORT_READ, "name": "报表查看", "description": "查看及导出预置报表"},
 ]

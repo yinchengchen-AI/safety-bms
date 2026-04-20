@@ -1,16 +1,14 @@
-from typing import List, Optional, Tuple
 from sqlalchemy.orm import Session
 
 from app.crud.base import CRUDBase
-from app.models.user import Role, Permission
+from app.models.user import Permission, Role
 from app.schemas.role import RoleCreate, RoleUpdate
-
 
 PREDEFINED_ROLES = {"admin", "manager", "sales", "finance", "viewer"}
 
 
 class CRUDRole(CRUDBase[Role, RoleCreate, RoleUpdate]):
-    def get_by_name(self, db: Session, *, name: str) -> Optional[Role]:
+    def get_by_name(self, db: Session, *, name: str) -> Role | None:
         return db.query(Role).filter(Role.name == name).first()
 
     def get_multi(
@@ -19,8 +17,8 @@ class CRUDRole(CRUDBase[Role, RoleCreate, RoleUpdate]):
         *,
         skip: int = 0,
         limit: int = 20,
-        keyword: Optional[str] = None,
-    ) -> Tuple[int, List[Role]]:
+        keyword: str | None = None,
+    ) -> tuple[int, list[Role]]:
         query = db.query(Role)
         if keyword:
             query = query.filter(Role.name.ilike(f"%{keyword}%"))
@@ -41,10 +39,7 @@ class CRUDRole(CRUDBase[Role, RoleCreate, RoleUpdate]):
         return db_obj
 
     def update(self, db: Session, *, db_obj: Role, obj_in: RoleUpdate | dict) -> Role:
-        if isinstance(obj_in, dict):
-            update_data = obj_in
-        else:
-            update_data = obj_in.model_dump(exclude_unset=True)
+        update_data = obj_in if isinstance(obj_in, dict) else obj_in.model_dump(exclude_unset=True)
 
         permission_ids = update_data.pop("permission_ids", None)
         for field, value in update_data.items():

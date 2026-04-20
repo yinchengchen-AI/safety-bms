@@ -1,42 +1,38 @@
-from typing import Optional
-from fastapi import APIRouter, Depends, Query, UploadFile, File
+from fastapi import APIRouter, Depends, File, Query, UploadFile
 from sqlalchemy.orm import Session, joinedload
 
-from app.db.session import get_db
-from app.schemas.service import (
-    ServiceOrderCreate,
-    ServiceOrderUpdate,
-    ServiceOrderOut,
-    ServiceOrderListOut,
-    ServiceOrderStatusUpdate,
-    ServiceReportOut,
-    ServiceItemCreate,
-    ServiceItemUpdate,
-    ServiceItemOut,
-)
-from app.schemas.common import PageResponse, ResponseMsg, FileUploadResponse
+from app.core.constants import PermissionCode, ServiceOrderStatus
+from app.core.exceptions import BusinessError, NotFoundError, PermissionDeniedError
 from app.crud.service import crud_service
+from app.db.session import get_db
 from app.dependencies import require_permissions
-from app.core.exceptions import NotFoundError, PermissionDeniedError, BusinessError
-from app.core.constants import ServiceOrderStatus, PermissionCode
-from app.models.service import ServiceOrder
 from app.models.contract import Contract
+from app.models.service import ServiceOrder
 from app.models.user import User
+from app.schemas.common import FileUploadResponse, PageResponse
+from app.schemas.service import (
+    ServiceItemCreate,
+    ServiceItemOut,
+    ServiceItemUpdate,
+    ServiceOrderCreate,
+    ServiceOrderListOut,
+    ServiceOrderOut,
+    ServiceOrderStatusUpdate,
+    ServiceOrderUpdate,
+)
 from app.services.minio_service import minio_service
 from app.services.notification_service import notification_service
 from app.utils.data_scope import apply_data_scope, check_data_scope
-from app.utils.pagination import make_page_response
 from app.utils.excel_export import export_excel_response
 from app.utils.export_mappings import SERVICE_ORDER_STATUS_MAP, map_value
+from app.utils.pagination import make_page_response
 
 router = APIRouter(prefix="/services", tags=["服务管理"])
 
 
 def _enrich_service_order_out(order, out: ServiceOrderOut) -> ServiceOrderOut:
     out.customer_name = (
-        order.contract.customer.name
-        if order.contract and order.contract.customer
-        else None
+        order.contract.customer.name if order.contract and order.contract.customer else None
     )
     out.assignee_name = order.assignee.full_name if order.assignee else None
     if order.service_type_obj:
@@ -48,9 +44,7 @@ def _enrich_service_order_out(order, out: ServiceOrderOut) -> ServiceOrderOut:
 
 def _enrich_service_order_list_out(order, out: ServiceOrderListOut) -> ServiceOrderListOut:
     out.customer_name = (
-        order.contract.customer.name
-        if order.contract and order.contract.customer
-        else None
+        order.contract.customer.name if order.contract and order.contract.customer else None
     )
     out.assignee_name = order.assignee.full_name if order.assignee else None
     if order.service_type_obj:
@@ -60,9 +54,7 @@ def _enrich_service_order_list_out(order, out: ServiceOrderListOut) -> ServiceOr
     return out
 
 
-def _get_service_order_with_relations(
-    db: Session, order_id: int
-) -> Optional[ServiceOrder]:
+def _get_service_order_with_relations(db: Session, order_id: int) -> ServiceOrder | None:
     return (
         db.query(ServiceOrder)
         .options(
@@ -78,9 +70,9 @@ def _get_service_order_with_relations(
 def list_service_orders(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=200),
-    contract_id: Optional[int] = None,
-    assignee_id: Optional[int] = None,
-    status: Optional[ServiceOrderStatus] = None,
+    contract_id: int | None = None,
+    assignee_id: int | None = None,
+    status: ServiceOrderStatus | None = None,
     current_user: User = Depends(require_permissions(PermissionCode.SERVICE_READ)),
     db: Session = Depends(get_db),
 ):
@@ -114,9 +106,9 @@ def list_service_orders(
 
 @router.get("/export")
 def export_service_orders(
-    contract_id: Optional[int] = None,
-    assignee_id: Optional[int] = None,
-    status: Optional[ServiceOrderStatus] = None,
+    contract_id: int | None = None,
+    assignee_id: int | None = None,
+    status: ServiceOrderStatus | None = None,
     current_user: User = Depends(require_permissions(PermissionCode.SERVICE_READ)),
     db: Session = Depends(get_db),
 ):
@@ -153,9 +145,7 @@ def export_service_orders(
             [
                 item.order_no,
                 item.title,
-                item.contract.customer.name
-                if item.contract and item.contract.customer
-                else "",
+                item.contract.customer.name if item.contract and item.contract.customer else "",
                 item.service_type_obj.name if item.service_type_obj else "",
                 item.assignee.full_name if item.assignee else "",
                 map_value(item.status.value if item.status else "", SERVICE_ORDER_STATUS_MAP),
@@ -221,9 +211,7 @@ def update_service_order(
     updated = crud_service.update(db, db_obj=order, obj_in=body)
     result = ServiceOrderOut.model_validate(updated)
     result.customer_name = (
-        updated.contract.customer.name
-        if updated.contract and updated.contract.customer
-        else None
+        updated.contract.customer.name if updated.contract and updated.contract.customer else None
     )
     result.assignee_name = updated.assignee.full_name if updated.assignee else None
     return result
@@ -266,9 +254,7 @@ def update_status(
             )
     result = ServiceOrderOut.model_validate(updated)
     result.customer_name = (
-        updated.contract.customer.name
-        if updated.contract and updated.contract.customer
-        else None
+        updated.contract.customer.name if updated.contract and updated.contract.customer else None
     )
     result.assignee_name = updated.assignee.full_name if updated.assignee else None
     return result
