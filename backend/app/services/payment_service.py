@@ -14,7 +14,10 @@ from app.schemas.payment import ContractReceivable, PaymentCreate
 class PaymentService:
     def create_payment(self, db: Session, *, obj_in: PaymentCreate, created_by: int) -> Payment:
         contract = (
-            db.query(Contract).filter(Contract.id == obj_in.contract_id).with_for_update().first()
+            db.query(Contract)
+            .filter(Contract.id == obj_in.contract_id, Contract.is_deleted == False)
+            .with_for_update()
+            .first()
         )
         if not contract:
             raise NotFoundError("合同")

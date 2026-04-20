@@ -27,7 +27,10 @@ class InvoiceService:
     def create_invoice(self, db: Session, *, obj_in: InvoiceCreate, applied_by: int) -> Invoice:
         # 1. 检查合同是否存在且生效（加锁防止竞态）
         contract = (
-            db.query(Contract).filter(Contract.id == obj_in.contract_id).with_for_update().first()
+            db.query(Contract)
+            .filter(Contract.id == obj_in.contract_id, Contract.is_deleted == False)
+            .with_for_update()
+            .first()
         )
         if not contract:
             raise NotFoundError("合同")

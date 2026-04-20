@@ -7,7 +7,7 @@ from app.crud.service import crud_service
 from app.db.session import get_db
 from app.dependencies import require_permissions
 from app.models.contract import Contract
-from app.models.service import ServiceOrder
+from app.models.service import ServiceItem, ServiceOrder
 from app.models.user import User
 from app.schemas.common import FileUploadResponse, PageResponse
 from app.schemas.service import (
@@ -28,6 +28,14 @@ from app.utils.export_mappings import SERVICE_ORDER_STATUS_MAP, map_value
 from app.utils.pagination import make_page_response
 
 router = APIRouter(prefix="/services", tags=["服务管理"])
+
+# 仅允许在待处理或处理中状态下进行修改操作
+_EDITABLE_STATUSES = (ServiceOrderStatus.PENDING, ServiceOrderStatus.IN_PROGRESS)
+
+
+def _check_editable_status(order: ServiceOrder) -> None:
+    if order.status not in _EDITABLE_STATUSES:
+        raise BusinessError(f"当前工单状态为 {order.status.value}，不可进行此操作")
 
 
 def _enrich_service_order_out(order, out: ServiceOrderOut) -> ServiceOrderOut:
@@ -208,6 +216,7 @@ def update_service_order(
         raise NotFoundError("服务工单")
     if not check_data_scope(order, current_user):
         raise PermissionDeniedError()
+    _check_editable_status(order)
     updated = crud_service.update(db, db_obj=order, obj_in=body)
     result = ServiceOrderOut.model_validate(updated)
     result.customer_name = (
@@ -272,6 +281,7 @@ def upload_report(
         raise NotFoundError("服务工单")
     if not check_data_scope(order, current_user):
         raise PermissionDeniedError()
+    _check_editable_status(order)
     result = minio_service.upload_file(file, prefix=f"service-reports/{order_id}")
     crud_service.add_report(
         db,
@@ -299,6 +309,7 @@ def create_service_item(
         raise NotFoundError("服务工单")
     if not check_data_scope(order, current_user):
         raise PermissionDeniedError()
+    _check_editable_status(order)
     item = crud_service.create_item(db, order_id=order_id, obj_in=body)
     return item
 
@@ -316,7 +327,8 @@ def update_service_item(
         raise NotFoundError("服务工单")
     if not check_data_scope(order, current_user):
         raise PermissionDeniedError()
-    item = crud_service.delete_item(db, item_id=item_id)
+    _check_editable_status(order)
+    item = db.query(ServiceItem).filter(ServiceItem.id == item_id).first()
     if not item:
         raise NotFoundError("服务项")
     if item.order_id != order_id:
@@ -337,6 +349,7 @@ def delete_service_item(
         raise NotFoundError("服务工单")
     if not check_data_scope(order, current_user):
         raise PermissionDeniedError()
+    _check_editable_status(order)
     item = crud_service.delete_item(db, item_id=item_id)
     if not item:
         raise NotFoundError("服务项")
@@ -360,6 +373,7 @@ def delete_service_report(
         raise NotFoundError("服务工单")
     if not check_data_scope(order, current_user):
         raise PermissionDeniedError()
+    _check_editable_status(order)
     report = crud_service.delete_report(db, report_id=report_id)
     if not report:
         raise NotFoundError("服务报告")
@@ -382,5 +396,6 @@ def delete_service_order(
         raise NotFoundError("服务工单")
     if not check_data_scope(order, current_user):
         raise PermissionDeniedError()
+    _check_editable_status(order)
     crud_service.remove(db, id=order_id)
     return {"message": "删除成功"}

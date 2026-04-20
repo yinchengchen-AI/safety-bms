@@ -39,13 +39,15 @@ def list_invoices(
     db: Session = Depends(get_db),
 ):
     skip = (page - 1) * page_size
-    query = db.query(Invoice)
+    query = (
+        db.query(Invoice)
+        .join(Contract, Invoice.contract_id == Contract.id)
+        .filter(Contract.is_deleted == False)
+    )
     if contract_id:
         query = query.filter(Invoice.contract_id == contract_id)
     if customer_id:
-        query = query.join(Contract, Invoice.contract_id == Contract.id).filter(
-            Contract.customer_id == customer_id
-        )
+        query = query.filter(Contract.customer_id == customer_id)
     if status:
         query = query.filter(Invoice.status == status)
     query = apply_data_scope(query, Invoice, current_user)
@@ -75,13 +77,15 @@ def export_invoices(
     current_user: User = Depends(require_permissions(PermissionCode.INVOICE_READ)),
     db: Session = Depends(get_db),
 ):
-    query = db.query(Invoice)
+    query = (
+        db.query(Invoice)
+        .join(Contract, Invoice.contract_id == Contract.id)
+        .filter(Contract.is_deleted == False)
+    )
     if contract_id:
         query = query.filter(Invoice.contract_id == contract_id)
     if customer_id:
-        query = query.join(Contract, Invoice.contract_id == Contract.id).filter(
-            Contract.customer_id == customer_id
-        )
+        query = query.filter(Contract.customer_id == customer_id)
     if status:
         query = query.filter(Invoice.status == status)
     query = apply_data_scope(query, Invoice, current_user)
@@ -158,11 +162,13 @@ def update_invoice(
         raise NotFoundError("发票")
     if not check_data_scope(invoice, current_user):
         raise PermissionDeniedError()
-    old_status = invoice.status
+    # 禁止直接修改为已开票/已寄出状态，必须通过审核接口
+    if body.status is not None and body.status in (InvoiceStatus.ISSUED, InvoiceStatus.SENT):
+        raise BusinessError("禁止直接修改为已开票或已寄出状态，请通过审核接口")
     updated = crud_invoice.update(db, db_obj=invoice, obj_in=body)
     if (
         body.status is not None
-        and body.status != old_status
+        and body.status != invoice.status
         and getattr(updated, "applied_by", None) is not None
     ):
         applied_by = int(updated.applied_by)

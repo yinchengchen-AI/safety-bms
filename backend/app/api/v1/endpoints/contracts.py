@@ -11,6 +11,9 @@ from app.crud.contract import crud_contract
 from app.db.session import get_db
 from app.dependencies import require_permissions
 from app.models.contract import Contract, ContractChange, ContractSignature, ContractTemplate
+from app.models.invoice import Invoice
+from app.models.payment import Payment
+from app.models.service import ServiceOrder
 from app.models.user import User
 from app.schemas.common import PageResponse, ResponseMsg
 from app.schemas.contract import (
@@ -184,7 +187,13 @@ def update_contract(
         raise NotFoundError("合同")
     if not check_data_scope(contract, current_user):
         raise PermissionDeniedError()
-    if contract.status in (ContractStatus.REVIEW, ContractStatus.ACTIVE, ContractStatus.SIGNED):
+    if contract.status in (
+        ContractStatus.REVIEW,
+        ContractStatus.ACTIVE,
+        ContractStatus.SIGNED,
+        ContractStatus.COMPLETED,
+        ContractStatus.TERMINATED,
+    ):
         raise BusinessError(f"{contract.status.value} 状态合同不可修改")
     if body.contract_no:
         existing = (
@@ -311,8 +320,12 @@ def generate_contract_draft(
         raise NotFoundError("合同")
     if not check_data_scope(contract, current_user):
         raise PermissionDeniedError()
-    if contract.status == ContractStatus.SIGNED:
-        raise BusinessError("已签订合同不可修改")
+    if contract.status in (
+        ContractStatus.SIGNED,
+        ContractStatus.COMPLETED,
+        ContractStatus.TERMINATED,
+    ):
+        raise BusinessError("已签订/已完成/已终止的合同不可修改")
     if not contract.template_id:
         raise BusinessError("该合同未选择模板，无法生成草稿")
 
@@ -471,6 +484,11 @@ def delete_contract(
         raise PermissionDeniedError()
     if contract.status != ContractStatus.DRAFT:
         raise BusinessError("只有草稿状态的合同可以删除")
+    has_orders = db.query(ServiceOrder).filter(ServiceOrder.contract_id == contract_id).first()
+    has_invoices = db.query(Invoice).filter(Invoice.contract_id == contract_id).first()
+    has_payments = db.query(Payment).filter(Payment.contract_id == contract_id).first()
+    if has_orders or has_invoices or has_payments:
+        raise BusinessError("该合同存在关联的工单、发票或收款记录，不可删除")
     crud_contract.soft_delete(db, contract_id=contract_id)
     return {"message": "删除成功"}
 

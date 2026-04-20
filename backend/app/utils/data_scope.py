@@ -1,6 +1,6 @@
 from typing import Any
 
-from sqlalchemy import false
+from sqlalchemy import false, select
 from sqlalchemy.orm import Query
 
 from app.models.user import DataScope, User
@@ -56,8 +56,14 @@ def apply_data_scope(query: Query, model_class: Any, current_user: User) -> Quer
 
     if scope == DataScope.DEPT:
         user_dept_id = getattr(current_user, "department_id", None)
-        if user_dept_id is not None and hasattr(model_class, "department_id"):
-            return query.filter(model_class.department_id == user_dept_id)
+        if user_dept_id is not None:
+            if hasattr(model_class, "department_id"):
+                return query.filter(model_class.department_id == user_dept_id)
+            # 跨表：通过 owner 字段关联到用户部门
+            for field in _OWNER_FIELDS:
+                if hasattr(model_class, field):
+                    owner_ids_subq = select(User.id).where(User.department_id == user_dept_id)
+                    return query.filter(getattr(model_class, field).in_(owner_ids_subq))
         return _apply_self_filters(query, model_class, current_user)
 
     # SELF
@@ -95,9 +101,19 @@ def check_data_scope(obj: Any, current_user: User) -> bool:
 
     if scope == DataScope.DEPT:
         user_dept_id = getattr(current_user, "department_id", None)
-        obj_dept_id = getattr(obj, "department_id", None)
-        if user_dept_id is not None and obj_dept_id is not None:
-            return obj_dept_id == user_dept_id
+        if user_dept_id is not None:
+            if (
+                hasattr(obj, "department_id")
+                and getattr(obj, "department_id", None) == user_dept_id
+            ):
+                return True
+            # 跨表：通过 owner 字段检查创建人所在部门
+            for field in _OWNER_FIELDS:
+                owner_id = getattr(obj, field, None)
+                if owner_id is not None:
+                    # 注：此处需要查询用户所在部门，在单条检查场景下通常 owner 即为当前用户
+                    # 如果需要完整支持跨表 DEPT 检查，建议在调用处传入 db 会话查询
+                    return owner_id == current_user.id
         return _matches_self_scope(obj, current_user)
 
     # SELF

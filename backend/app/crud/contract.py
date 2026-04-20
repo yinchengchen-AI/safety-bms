@@ -93,6 +93,9 @@ class CRUDContract(CRUDBase[Contract, ContractCreate, ContractUpdate]):
         return db_obj
 
     def get_invoiced_amount(self, db: Session, *, contract_id: int) -> Decimal:
+        contract = db.query(Contract).filter(Contract.id == contract_id).first()
+        if not contract or contract.is_deleted:
+            return Decimal("0")
         result = (
             db.query(func.coalesce(func.sum(Invoice.amount), 0))
             .filter(Invoice.contract_id == contract_id)
@@ -102,6 +105,9 @@ class CRUDContract(CRUDBase[Contract, ContractCreate, ContractUpdate]):
         return Decimal(str(result))
 
     def get_received_amount(self, db: Session, *, contract_id: int) -> Decimal:
+        contract = db.query(Contract).filter(Contract.id == contract_id).first()
+        if not contract or contract.is_deleted:
+            return Decimal("0")
         result = (
             db.query(func.coalesce(func.sum(Payment.amount), 0))
             .filter(Payment.contract_id == contract_id)

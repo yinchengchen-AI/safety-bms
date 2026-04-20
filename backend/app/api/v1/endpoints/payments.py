@@ -39,13 +39,15 @@ def list_payments(
     db: Session = Depends(get_db),
 ):
     skip = (page - 1) * page_size
-    query = db.query(Payment)
+    query = (
+        db.query(Payment)
+        .join(Contract, Payment.contract_id == Contract.id)
+        .filter(Contract.is_deleted == False)
+    )
     if contract_id:
         query = query.filter(Payment.contract_id == contract_id)
     if customer_id:
-        query = query.join(Contract, Payment.contract_id == Contract.id).filter(
-            Contract.customer_id == customer_id
-        )
+        query = query.filter(Contract.customer_id == customer_id)
     if invoice_id:
         query = query.filter(Payment.invoice_id == invoice_id)
     query = apply_data_scope(query, Payment, current_user)
@@ -76,13 +78,15 @@ def export_payments(
     current_user: User = Depends(require_permissions(PermissionCode.PAYMENT_READ)),
     db: Session = Depends(get_db),
 ):
-    query = db.query(Payment)
+    query = (
+        db.query(Payment)
+        .join(Contract, Payment.contract_id == Contract.id)
+        .filter(Contract.is_deleted == False)
+    )
     if contract_id:
         query = query.filter(Payment.contract_id == contract_id)
     if customer_id:
-        query = query.join(Contract, Payment.contract_id == Contract.id).filter(
-            Contract.customer_id == customer_id
-        )
+        query = query.filter(Contract.customer_id == customer_id)
     if invoice_id:
         query = query.filter(Payment.invoice_id == invoice_id)
     query = apply_data_scope(query, Payment, current_user)
