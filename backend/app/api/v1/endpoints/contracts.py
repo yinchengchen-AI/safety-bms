@@ -375,17 +375,25 @@ def generate_contract_draft(
         ContractStatus.TERMINATED,
     ):
         raise BusinessError("已签订/已完成/已终止的合同不可修改")
-    if not contract.template_id:
-        raise BusinessError("该合同未选择模板，无法生成草稿")
 
-    template = (
-        db.query(ContractTemplate).filter(ContractTemplate.id == contract.template_id).first()
-    )
-    if not template or not template.file_url:
-        raise BusinessError("模板文件不存在")
+    if contract.template_id:
+        template = (
+            db.query(ContractTemplate).filter(ContractTemplate.id == contract.template_id).first()
+        )
+        if not template or not template.file_url:
+            raise BusinessError("模板文件不存在")
+        draft_object_name = render_contract_draft(contract, template.file_url)
+        updated = crud_contract.update(
+            db, db_obj=contract, obj_in={"draft_doc_url": draft_object_name}
+        )
+    else:
+        standard_object_name = render_standard_contract_draft(contract, db)
+        if not standard_object_name:
+            raise BusinessError("未找到默认合同模板，无法生成标准合同草稿")
+        updated = crud_contract.update(
+            db, db_obj=contract, obj_in={"standard_doc_url": standard_object_name}
+        )
 
-    draft_object_name = render_contract_draft(contract, template.file_url)
-    updated = crud_contract.update(db, db_obj=contract, obj_in={"draft_doc_url": draft_object_name})
     result = ContractOut.model_validate(updated)
     result.customer_name = updated.customer.name if updated.customer else None
     result.invoiced_amount = crud_contract.get_invoiced_amount(db, contract_id=contract_id)

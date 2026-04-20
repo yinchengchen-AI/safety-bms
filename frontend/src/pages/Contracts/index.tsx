@@ -232,7 +232,7 @@ const Contracts: React.FC = () => {
             <PermissionButton permission="contract:update" size="small" onClick={() => updateStatus({ id: r.id, status: 'draft' })}>审核驳回</PermissionButton>
           </>
         )}
-        {r.status === 'draft' && r.template_id && (
+        {r.status === 'draft' && (
           <PermissionButton permission="contract:update" size="small" icon={<FileTextOutlined />} onClick={() => handleGenerateDraft(r.id)} loading={generatingDraft}>生成草稿</PermissionButton>
         )}
         {r.status === 'active' && (r.draft_doc_url || r.standard_doc_url) && (
@@ -443,7 +443,7 @@ const ContractDetail: React.FC<{
           {data.status === 'signed' && (
             <PermissionButton permission="contract:update" onClick={() => updateStatus({ id: data.id, status: 'executing' })}>开始履行</PermissionButton>
           )}
-          {data.status === 'draft' && data.template_id && (
+          {data.status === 'draft' && (
             <PermissionButton permission="contract:update" icon={<FileTextOutlined />} onClick={() => onGenerateDraft(data.id)} loading={generatingDraft}>生成草稿</PermissionButton>
           )}
         </Space>
