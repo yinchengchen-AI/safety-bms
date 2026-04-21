@@ -59,10 +59,10 @@ export const formatAmount = (amount: number | string | undefined): string => {
   return `¥${Number(amount).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
-// 格式化日期时间（自动将 UTC 转为本地北京时间）
+// 格式化日期时间（显式转为东八区）
 export const formatDateTime = (value?: string | null, template = 'YYYY-MM-DD HH:mm'): string => {
   if (!value) return '-'
-  return dayjs(value).format(template)
+  return dayjs(value).tz('Asia/Shanghai').format(template)
 }
 
 // 格式化日期

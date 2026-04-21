@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, File, Query, UploadFile
 from sqlalchemy.orm import Session
 
 from app.core.constants import CustomerStatus, PermissionCode
@@ -88,10 +88,10 @@ def export_customers(
                 c.created_at.strftime("%Y-%m-%d %H:%M") if c.created_at else "",
             ]
         )
-    from datetime import datetime
+    from datetime import UTC, datetime
 
     return export_excel_response(
-        f"customers_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx", headers, rows
+        f"customers_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}.xlsx", headers, rows
     )
 
 
@@ -146,6 +146,72 @@ def delete_customer(
         raise PermissionDeniedError()
     crud_customer.soft_delete(db, customer_id=customer_id)
     return {"message": "删除成功"}
+
+
+@router.post("/import", response_model=dict)
+def import_customers(
+    file: UploadFile = File(...),
+    current_user: User = Depends(require_permissions(PermissionCode.CUSTOMER_CREATE)),
+    db: Session = Depends(get_db),
+):
+    import io
+
+    from openpyxl import load_workbook
+
+    content = file.file.read()
+    try:
+        wb = load_workbook(io.BytesIO(content))
+    except Exception as exc:
+        raise BusinessError(f"无法解析Excel文件: {exc}") from exc
+
+    ws = wb.active
+    if not ws:
+        raise BusinessError("Excel文件为空")
+
+    headers = [cell.value for cell in ws[1]]
+    expected = ["客户名称", "统一信用代码", "行业", "规模", "地址", "联系人", "联系电话"]
+    if headers[: len(expected)] != expected:
+        raise BusinessError(f"Excel表头不符合要求，期望: {expected}")
+
+    success = 0
+    errors: list[dict] = []
+    for idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+        name = str(row[0]).strip() if row[0] else None
+        if not name:
+            continue
+        credit_code = str(row[1]).strip() if row[1] else None
+        industry = str(row[2]).strip() if row[2] else None
+        scale = str(row[3]).strip() if row[3] else None
+        address = str(row[4]).strip() if row[4] else None
+        contact_name = str(row[5]).strip() if row[5] else None
+        contact_phone = str(row[6]).strip() if row[6] else None
+        try:
+            existing = (
+                db.query(Customer)
+                .filter(Customer.name == name, Customer.is_deleted == False)
+                .first()
+            )
+            if existing:
+                errors.append({"row": idx, "error": f"客户名称 '{name}' 已存在"})
+                continue
+            crud_customer.create(
+                db,
+                obj_in=CustomerCreate(
+                    name=name,
+                    credit_code=credit_code,
+                    industry=industry,
+                    scale=scale,
+                    address=address,
+                    contact_name=contact_name,
+                    contact_phone=contact_phone,
+                ),
+                created_by=current_user.id,
+            )
+            success += 1
+        except Exception as exc:
+            errors.append({"row": idx, "error": str(exc)})
+
+    return {"success": success, "failed": len(errors), "errors": errors}
 
 
 @router.post("/{customer_id}/contacts", response_model=CustomerContactOut, status_code=201)

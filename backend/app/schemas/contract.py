@@ -129,6 +129,19 @@ class ContractSignRequest(BaseModel):
         return self
 
 
+class ContractSingleSignRequest(BaseModel):
+    party: str = Field(..., pattern="^(party_a|party_b)$")
+    signed_by: str
+    signature_base64: str
+
+    @model_validator(mode="after")
+    def check_signature_size(self):
+        max_base64_len = 3 * 1024 * 1024
+        if self.signature_base64 and len(self.signature_base64) > max_base64_len:
+            raise ValueError("签名图片过大，请压缩后重新上传")
+        return self
+
+
 class ContractUploadSignedRequest(BaseModel):
     file_url: str
     sign_date: date | None = None

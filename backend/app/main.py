@@ -5,6 +5,7 @@ from fastapi.responses import JSONResponse
 from app.api.v1.router import api_router
 from app.config import settings
 from app.core.exceptions import BusinessError
+from app.core.scheduler import shutdown_scheduler, start_scheduler
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -35,6 +36,16 @@ async def business_error_handler(request: Request, exc: BusinessError):
 
 # 注册路由
 app.include_router(api_router)
+
+
+@app.on_event("startup")
+def on_startup():
+    start_scheduler()
+
+
+@app.on_event("shutdown")
+def on_shutdown():
+    shutdown_scheduler()
 
 
 @app.get("/health")

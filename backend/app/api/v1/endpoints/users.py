@@ -70,10 +70,10 @@ def export_users(
                 u.created_at.strftime("%Y-%m-%d %H:%M") if u.created_at else "",
             ]
         )
-    from datetime import datetime
+    from datetime import UTC, datetime
 
     return export_excel_response(
-        f"users_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx", headers, rows
+        f"users_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}.xlsx", headers, rows
     )
 
 

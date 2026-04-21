@@ -85,5 +85,39 @@ class MinIOService:
         with contextlib.suppress(S3Error):
             self.client.remove_object(self.bucket, object_name)
 
+    def upload_base64_image(self, base64_data: str, prefix: str = "") -> dict:
+        """上传 base64 编码的 PNG 图片并返回 MinIO 对象路径"""
+        try:
+            import base64
+            import re
+
+            # 移除 data:image/png;base64, 前缀
+            data = re.sub(r"^data:image/\w+;base64,", "", base64_data)
+            content = base64.b64decode(data)
+            file_size = len(content)
+            if file_size > MAX_FILE_SIZE:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"图片大小({file_size / 1024 / 1024:.2f}MB)超过最大限制({MAX_FILE_SIZE / 1024 / 1024:.0f}MB)",
+                )
+
+            object_name = (
+                f"{prefix}/{uuid.uuid4().hex}.png" if prefix else f"{uuid.uuid4().hex}.png"
+            )
+            self.client.put_object(
+                self.bucket,
+                object_name,
+                BytesIO(content),
+                length=file_size,
+                content_type="image/png",
+            )
+            return {
+                "file_url": object_name,
+                "file_name": object_name.rsplit("/", 1)[-1],
+                "file_size": file_size,
+            }
+        except S3Error as e:
+            raise HTTPException(status_code=500, detail=f"文件上传失败: {str(e)}") from e
+
 
 minio_service = MinIOService()

@@ -120,10 +120,10 @@ def export_invoices(
                 item.created_at.strftime("%Y-%m-%d %H:%M") if item.created_at else "",
             ]
         )
-    from datetime import datetime
+    from datetime import UTC, datetime
 
     return export_excel_response(
-        f"invoices_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx", headers, rows
+        f"invoices_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}.xlsx", headers, rows
     )
 
 

@@ -50,10 +50,10 @@ def export_departments(
                 d.created_at.strftime("%Y-%m-%d %H:%M") if d.created_at else "",
             ]
         )
-    from datetime import datetime
+    from datetime import UTC, datetime
 
     return export_excel_response(
-        f"departments_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx", headers, rows
+        f"departments_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}.xlsx", headers, rows
     )
 
 

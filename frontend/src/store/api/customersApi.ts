@@ -38,6 +38,14 @@ export const customersApi = baseApi.injectEndpoints({
       query: (customerId) => `/customers/${customerId}/follow-ups`,
       providesTags: (_, __, customerId) => [{ type: 'Customer', id: customerId }],
     }),
+    importCustomers: builder.mutation<{ success: number; failed: number; errors: { row: number; error: string }[] }, File>({
+      query: (file) => {
+        const formData = new FormData()
+        formData.append('file', file)
+        return { url: '/customers/import', method: 'POST', body: formData }
+      },
+      invalidatesTags: ['Customer'],
+    }),
   }),
 })
 
@@ -50,4 +58,5 @@ export const {
   useAddContactMutation,
   useAddFollowUpMutation,
   useListFollowUpsQuery,
+  useImportCustomersMutation,
 } = customersApi

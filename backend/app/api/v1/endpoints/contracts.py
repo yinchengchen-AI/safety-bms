@@ -9,7 +9,13 @@ from app.core.exceptions import BusinessError, DuplicateError, NotFoundError, Pe
 from app.crud.contract import crud_contract
 from app.db.session import get_db
 from app.dependencies import require_permissions
-from app.models.contract import Contract, ContractAttachment, ContractChange, ContractTemplate
+from app.models.contract import (
+    Contract,
+    ContractAttachment,
+    ContractChange,
+    ContractSignature,
+    ContractTemplate,
+)
 from app.models.invoice import Invoice
 from app.models.payment import Payment
 from app.models.service import ServiceOrder, ServiceOrderStatus
@@ -20,6 +26,7 @@ from app.schemas.contract import (
     ContractCreate,
     ContractListOut,
     ContractOut,
+    ContractSingleSignRequest,
     ContractStatusUpdate,
     ContractUpdate,
 )
@@ -51,6 +58,9 @@ def _enrich_contract_out(contract, out: ContractOut) -> ContractOut:
     for att in out.attachments:
         with contextlib.suppress(Exception):
             att.file_url = minio_service.get_presigned_url(att.file_url)
+    for sig in out.signatures:
+        with contextlib.suppress(Exception):
+            sig.signature_url = minio_service.get_presigned_url(sig.signature_url)
     return out
 
 
@@ -140,10 +150,10 @@ def export_contracts(
                 map_value(c.status.value if c.status else "", CONTRACT_STATUS_MAP),
             ]
         )
-    from datetime import datetime
+    from datetime import UTC, datetime
 
     return export_excel_response(
-        f"contracts_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx", headers, rows
+        f"contracts_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}.xlsx", headers, rows
     )
 
 
@@ -164,7 +174,7 @@ def get_contract(
 ):
     contract = (
         db.query(Contract)
-        .options(joinedload(Contract.attachments))
+        .options(joinedload(Contract.attachments), joinedload(Contract.signatures))
         .filter(Contract.id == contract_id, Contract.is_deleted == False)
         .first()
     )
@@ -309,6 +319,105 @@ def update_contract_status(
     return updated
 
 
+@router.post("/{contract_id}/sign", response_model=ContractOut)
+def sign_contract(
+    contract_id: int,
+    body: ContractSingleSignRequest,
+    current_user: User = Depends(require_permissions(PermissionCode.CONTRACT_SIGN)),
+    db: Session = Depends(get_db),
+):
+    contract = (
+        db.query(Contract)
+        .filter(Contract.id == contract_id, Contract.is_deleted == False)
+        .with_for_update()
+        .first()
+    )
+    if not contract:
+        raise NotFoundError("合同")
+    if not check_data_scope(contract, current_user):
+        raise PermissionDeniedError()
+    if contract.status in (ContractStatus.COMPLETED, ContractStatus.TERMINATED):
+        raise BusinessError(f"{contract.status.value} 状态合同不可签署")
+
+    # 保存签名图片到 MinIO
+    upload_result = minio_service.upload_base64_image(
+        body.signature_base64, prefix=f"contracts/{contract_id}/signatures"
+    )
+
+    # 创建签署记录
+    signature = ContractSignature(
+        contract_id=contract.id,
+        party=body.party,
+        signed_by=body.signed_by,
+        signature_url=upload_result["file_url"],
+        signed_at=datetime.now(UTC),
+    )
+    db.add(signature)
+
+    # 自动状态迁移：若签订日期已到或未设置签订日期，直接变为履行中
+    if contract.status == ContractStatus.DRAFT:
+        from datetime import date as dt_date
+
+        if contract.sign_date and contract.sign_date <= dt_date.today():
+            contract.status = ContractStatus.EXECUTING
+            contract.signed_at = datetime.now(UTC)
+            db.add(
+                ContractChange(
+                    contract_id=contract.id,
+                    changed_by=current_user.id,
+                    change_summary="状态变更: draft → executing (电子签名)",
+                    before_status="draft",
+                    after_status="executing",
+                    remark=f"签署方: {body.party}, 签署人: {body.signed_by}",
+                )
+            )
+        else:
+            contract.status = ContractStatus.SIGNED
+            contract.signed_at = datetime.now(UTC)
+            db.add(
+                ContractChange(
+                    contract_id=contract.id,
+                    changed_by=current_user.id,
+                    change_summary="状态变更: draft → signed (电子签名)",
+                    before_status="draft",
+                    after_status="signed",
+                    remark=f"签署方: {body.party}, 签署人: {body.signed_by}",
+                )
+            )
+        # 通知创建者
+        creator = db.query(User).filter(User.id == contract.created_by).first()
+        if creator and creator.id != current_user.id:
+            total_str = (
+                format(contract.total_amount, ".2f")
+                if contract.total_amount is not None
+                else "0.00"
+            )
+            customer_name = contract.customer.name if contract.customer else ""
+            customer_line = f"客户：{customer_name}\n" if customer_name else ""
+            notification_service.create(
+                db,
+                user_id=creator.id,
+                title=(
+                    "合同已签订" if contract.status == ContractStatus.SIGNED else "合同已开始履行"
+                ),
+                content=(
+                    f"您的合同 {contract.title}（{contract.contract_no}）"
+                    f"{'已签订' if contract.status == ContractStatus.SIGNED else '已开始履行'}。\n"
+                    f"{customer_line}"
+                    f"合同总金额：{total_str} 元。"
+                ),
+            )
+
+    db.commit()
+    db.refresh(contract)
+
+    result = ContractOut.model_validate(contract)
+    _enrich_contract_out(contract, result)
+    result.invoiced_amount = crud_contract.get_invoiced_amount(db, contract_id=contract_id)
+    result.received_amount = crud_contract.get_received_amount(db, contract_id=contract_id)
+    return result
+
+
 @router.get("/{contract_id}/draft-url")
 def get_contract_draft_url(
     contract_id: int,
@@ -425,18 +534,34 @@ def upload_contract_attachment(
     db.add(attachment)
 
     if body.file_type == "signed" and contract.status == ContractStatus.DRAFT:
-        contract.status = ContractStatus.SIGNED
-        contract.signed_at = datetime.now(UTC)
-        db.add(
-            ContractChange(
-                contract_id=contract.id,
-                changed_by=current_user.id,
-                change_summary="状态变更: draft → signed (上传已签合同附件)",
-                before_status="draft",
-                after_status="signed",
-                remark="",
+        from datetime import date as dt_date
+
+        if contract.sign_date and contract.sign_date <= dt_date.today():
+            contract.status = ContractStatus.EXECUTING
+            contract.signed_at = datetime.now(UTC)
+            db.add(
+                ContractChange(
+                    contract_id=contract.id,
+                    changed_by=current_user.id,
+                    change_summary="状态变更: draft → executing (上传已签合同附件)",
+                    before_status="draft",
+                    after_status="executing",
+                    remark="",
+                )
             )
-        )
+        else:
+            contract.status = ContractStatus.SIGNED
+            contract.signed_at = datetime.now(UTC)
+            db.add(
+                ContractChange(
+                    contract_id=contract.id,
+                    changed_by=current_user.id,
+                    change_summary="状态变更: draft → signed (上传已签合同附件)",
+                    before_status="draft",
+                    after_status="signed",
+                    remark="",
+                )
+            )
 
     db.commit()
     db.refresh(contract)
