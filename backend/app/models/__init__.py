@@ -1,5 +1,6 @@
 from app.models.contract import Contract, ContractChange
 from app.models.customer import Customer, CustomerContact, CustomerFollowUp
+from app.models.department import Department
 from app.models.invoice import Invoice
 from app.models.payment import Payment
 from app.models.service import ServiceItem, ServiceOrder, ServiceReport
@@ -10,6 +11,7 @@ __all__ = [
     "User",
     "Role",
     "UserRole",
+    "Department",
     "Customer",
     "CustomerContact",
     "CustomerFollowUp",
