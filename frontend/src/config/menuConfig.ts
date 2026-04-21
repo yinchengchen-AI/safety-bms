@@ -46,8 +46,15 @@ export const menuConfig: MenuItem[] = [
       { key: '/payments', icon: DollarOutlined, label: '收款管理', path: '/payments', requiredPermissions: ['payment:read'] },
     ],
   },
-  { key: '/analytics', icon: BarChartOutlined, label: '统计分析', path: '/analytics', requiredPermissions: ['analytics:read'] },
-  { key: '/reports', icon: FileTextOutlined, label: '报表中心', path: '/reports', requiredPermissions: ['report:read'] },
+  {
+    key: 'analytics-reports',
+    icon: BarChartOutlined,
+    label: '统计报表',
+    children: [
+      { key: '/analytics', icon: BarChartOutlined, label: '统计分析', path: '/analytics', requiredPermissions: ['analytics:read'] },
+      { key: '/reports', icon: FileTextOutlined, label: '报表中心', path: '/reports', requiredPermissions: ['report:read'] },
+    ],
+  },
   {
     key: 'system',
     icon: SettingOutlined,
