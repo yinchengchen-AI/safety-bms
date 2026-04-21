@@ -9,7 +9,7 @@ from app.dependencies import require_permissions
 from app.models.contract import ContractTemplate
 from app.models.user import User
 from app.schemas.common import FileUploadResponse, PageResponse, ResponseMsg
-from app.schemas.contract import ContractTemplateCreate, ContractTemplateOut
+from app.schemas.contract import ContractTemplateCreate, ContractTemplateOut, ContractTemplateUpdate
 from app.services.minio_service import minio_service
 from app.utils.pagination import make_page_response
 
@@ -48,6 +48,20 @@ def create_contract_template(
     db: Session = Depends(get_db),
 ):
     return crud_contract_template.create(db, obj_in=body, created_by=current_user.id)
+
+
+@router.patch("/{template_id}", response_model=ContractTemplateOut)
+def update_contract_template(
+    template_id: int,
+    body: ContractTemplateUpdate,
+    current_user: User = Depends(require_permissions(PermissionCode.CONTRACT_UPDATE)),
+    db: Session = Depends(get_db),
+):
+    template = crud_contract_template.get(db, id=template_id)
+    if not template:
+        raise NotFoundError("合同模板")
+    crud_contract_template.update(db, db_obj=template, obj_in=body.model_dump(exclude_unset=True))
+    return ContractTemplateOut.model_validate(template)
 
 
 @router.post("/{template_id}/upload", response_model=FileUploadResponse)

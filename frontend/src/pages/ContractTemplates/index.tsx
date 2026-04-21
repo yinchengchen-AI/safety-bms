@@ -1,8 +1,8 @@
 import React, { useState, useMemo } from 'react'
 import { Table, Button, Space, Select, Input, message, Drawer, Form, Upload, Tag, Popconfirm, Modal, Switch } from 'antd'
-import { PlusOutlined, UploadOutlined, EyeOutlined } from '@ant-design/icons'
+import { PlusOutlined, UploadOutlined, EyeOutlined, EditOutlined } from '@ant-design/icons'
 import { PermissionButton } from '@/components/auth/PermissionButton'
-import { useListContractTemplatesQuery, useCreateContractTemplateMutation, useUploadContractTemplateFileMutation, useDeleteContractTemplateMutation, useLazyGetTemplateDownloadUrlQuery } from '@/store/api/contractTemplatesApi'
+import { useListContractTemplatesQuery, useCreateContractTemplateMutation, useUpdateContractTemplateMutation, useUploadContractTemplateFileMutation, useDeleteContractTemplateMutation, useLazyGetTemplateDownloadUrlQuery } from '@/store/api/contractTemplatesApi'
 import { useListServiceTypesQuery } from '@/store/api/serviceTypesApi'
 import type { ContractTemplate } from '@/types'
 import { formatDateTime } from '@/utils/constants'
@@ -12,12 +12,16 @@ const ContractTemplates: React.FC = () => {
   const [serviceType, setServiceType] = useState<number | undefined>()
   const [createOpen, setCreateOpen] = useState(false)
   const [createFile, setCreateFile] = useState<File | null>(null)
+  const [editOpen, setEditOpen] = useState(false)
+  const [editFile, setEditFile] = useState<File | null>(null)
+  const [editingId, setEditingId] = useState<number | null>(null)
   const [previewOpen, setPreviewOpen] = useState(false)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [form] = Form.useForm()
 
   const { data, isLoading } = useListContractTemplatesQuery({ page, page_size: 20, service_type: serviceType })
   const [createTemplate, { isLoading: creating }] = useCreateContractTemplateMutation()
+  const [updateTemplate, { isLoading: updating }] = useUpdateContractTemplateMutation()
   const [uploadTemplateFile, { isLoading: uploading }] = useUploadContractTemplateFileMutation()
   const [deleteTemplate] = useDeleteContractTemplateMutation()
   const [getDownloadUrl, { isFetching: previewLoading }] = useLazyGetTemplateDownloadUrlQuery()
@@ -46,6 +50,33 @@ const ContractTemplates: React.FC = () => {
     } catch (err: any) {
       message.error(err?.data?.detail || '创建失败')
     }
+  }
+
+  const handleEdit = async (values: { name: string; service_type: number; is_default: boolean }) => {
+    if (!editingId) return
+    try {
+      await updateTemplate({ id: editingId, data: values }).unwrap()
+      if (editFile) {
+        await uploadTemplateFile({ id: editingId, file: editFile }).unwrap()
+      }
+      message.success('模板更新成功')
+      setEditOpen(false)
+      setEditingId(null)
+      setEditFile(null)
+    } catch (err: any) {
+      message.error(err?.data?.detail || '更新失败')
+    }
+  }
+
+  const openEdit = (record: ContractTemplate) => {
+    setEditingId(record.id)
+    form.setFieldsValue({
+      name: record.name,
+      service_type: record.service_type,
+      is_default: record.is_default,
+    })
+    setEditFile(null)
+    setEditOpen(true)
   }
 
   const handleDelete = async (id: number) => {
@@ -81,6 +112,7 @@ const ContractTemplates: React.FC = () => {
           {r.file_url && (
             <PermissionButton permission="contract:read" type="link" size="small" icon={<EyeOutlined />} onClick={() => handlePreview(r.id)}>预览</PermissionButton>
           )}
+          <PermissionButton permission="contract:update" type="link" size="small" icon={<EditOutlined />} onClick={() => openEdit(r)}>编辑</PermissionButton>
           {!r.file_url && (
             <Upload
               beforeUpload={(file) => {
@@ -158,6 +190,44 @@ const ContractTemplates: React.FC = () => {
               <Button icon={<UploadOutlined />}>选择文件</Button>
             </Upload>
             {createFile && <div style={{ marginTop: 8, color: '#52c41a' }}>已选择: {createFile.name}</div>}
+          </Form.Item>
+        </Form>
+      </Drawer>
+
+      <Drawer
+        title="编辑合同模板"
+        open={editOpen}
+        onClose={() => { setEditOpen(false); setEditingId(null); setEditFile(null) }}
+        width={640}
+        footer={
+          <Space style={{ float: 'right' }}>
+            <Button onClick={() => { setEditOpen(false); setEditingId(null); setEditFile(null) }}>取消</Button>
+            <Button type="primary" loading={updating || uploading} onClick={() => form.submit()}>保存</Button>
+          </Space>
+        }
+      >
+        <Form form={form} layout="vertical" onFinish={handleEdit}>
+          <Form.Item name="name" label="模板名称" rules={[{ required: true }]}>
+            <Input placeholder="例如：安全评价合同模板" />
+          </Form.Item>
+          <Form.Item name="service_type" label="服务类型" rules={[{ required: true }]}>
+            <Select
+              options={serviceTypeOptions}
+              placeholder="请选择服务类型"
+            />
+          </Form.Item>
+          <Form.Item name="is_default" label="默认模板" valuePropName="checked">
+            <Switch />
+          </Form.Item>
+          <Form.Item label="替换模板文件 (.docx)">
+            <Upload
+              beforeUpload={(file) => { setEditFile(file); return false }}
+              maxCount={1}
+              accept=".docx"
+            >
+              <Button icon={<UploadOutlined />}>选择文件</Button>
+            </Upload>
+            {editFile && <div style={{ marginTop: 8, color: '#52c41a' }}>已选择: {editFile.name}</div>}
           </Form.Item>
         </Form>
       </Drawer>

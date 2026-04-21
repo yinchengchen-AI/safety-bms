@@ -86,6 +86,12 @@ class ContractTemplateCreate(BaseModel):
     is_default: bool = False
 
 
+class ContractTemplateUpdate(BaseModel):
+    name: str | None = None
+    service_type: int | None = None
+    is_default: bool | None = None
+
+
 class ContractTemplateOut(BaseModel):
     id: int
     name: str

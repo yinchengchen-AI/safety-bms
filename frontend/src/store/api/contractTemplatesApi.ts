@@ -29,6 +29,10 @@ export const contractTemplatesApi = baseApi.injectEndpoints({
       },
       invalidatesTags: (_, __, { id }) => [{ type: 'ContractTemplate', id }, 'ContractTemplate'],
     }),
+    updateContractTemplate: builder.mutation<ContractTemplate, { id: number; data: Partial<ContractTemplateCreate> }>({
+      query: ({ id, data }) => ({ url: `/contract-templates/${id}`, method: 'PATCH', body: data }),
+      invalidatesTags: (_, __, { id }) => [{ type: 'ContractTemplate', id }, 'ContractTemplate'],
+    }),
     deleteContractTemplate: builder.mutation<{ message: string }, number>({
       query: (id) => ({ url: `/contract-templates/${id}`, method: 'DELETE' }),
       invalidatesTags: ['ContractTemplate'],
@@ -42,6 +46,7 @@ export const contractTemplatesApi = baseApi.injectEndpoints({
 export const {
   useListContractTemplatesQuery,
   useCreateContractTemplateMutation,
+  useUpdateContractTemplateMutation,
   useUploadContractTemplateFileMutation,
   useDeleteContractTemplateMutation,
   useLazyGetTemplateDownloadUrlQuery,
