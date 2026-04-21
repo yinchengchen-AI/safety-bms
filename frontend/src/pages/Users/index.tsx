@@ -156,7 +156,7 @@ const Users: React.FC = () => {
         <Form form={form} layout="vertical" onFinish={handleCreate}>
           <Form.Item name="username" label="用户名" rules={[{ required: true }]}><Input /></Form.Item>
           <Form.Item name="full_name" label="姓名" rules={[{ required: true }]}><Input /></Form.Item>
-          <Form.Item name="email" label="邮箱" rules={[{ type: 'email' }]}><Input /></Form.Item>
+          <Form.Item name="email" label="邮箱" rules={[{ required: true, type: 'email' }]}><Input /></Form.Item>
           <Form.Item name="phone" label="手机号"><Input /></Form.Item>
           <Form.Item name="password" label="密码" rules={[{ required: true, min: 8 }]}><Input.Password /></Form.Item>
           <Form.Item name="department_id" label="部门">
@@ -177,7 +177,7 @@ const Users: React.FC = () => {
       }>
         <Form form={editForm} layout="vertical" onFinish={handleUpdate}>
           <Form.Item name="full_name" label="姓名" rules={[{ required: true }]}><Input /></Form.Item>
-          <Form.Item name="email" label="邮箱" rules={[{ type: 'email' }]}><Input /></Form.Item>
+          <Form.Item name="email" label="邮箱" rules={[{ required: true, type: 'email' }]}><Input /></Form.Item>
           <Form.Item name="phone" label="手机号"><Input /></Form.Item>
           <Form.Item name="department_id" label="部门">
             <TreeSelect treeData={deptTreeData} allowClear placeholder="请选择部门" treeDefaultExpandAll />

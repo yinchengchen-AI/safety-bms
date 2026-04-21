@@ -68,7 +68,7 @@ class MinIOService:
             raise HTTPException(status_code=500, detail=f"文件上传失败: {str(e)}") from e
 
     def get_presigned_url(self, object_name: str, expires_seconds: int = 3600) -> str:
-        """生成预签名下载URL"""
+        """生成预签名下载URL，通过 nginx /minio/ 代理访问"""
         from datetime import timedelta
 
         try:
@@ -77,7 +77,12 @@ class MinIOService:
                 object_name,
                 expires=timedelta(seconds=expires_seconds),
             )
-            return url
+            # 将内网地址替换为公网 nginx 代理地址
+            # nginx 会代理 /minio/ 到 MinIO，并保持 Host: minio:9000 头，使签名验证通过
+            public_url = url.replace(
+                f"http://{settings.MINIO_ENDPOINT}", "http://43.133.14.168:82/minio"
+            ).replace(f"https://{settings.MINIO_ENDPOINT}", "https://43.133.14.168:82/minio")
+            return public_url
         except S3Error as e:
             raise HTTPException(status_code=500, detail=f"生成下载链接失败: {str(e)}") from e
 

@@ -61,16 +61,28 @@ const Roles: React.FC = () => {
       name: record.name,
       description: record.description,
       data_scope: record.data_scope || 'ALL',
-      permission_ids: record.permissions?.map((p: any) => p.id) || [],
+      permission_ids: record.permissions?.map((p: any) => p.id).filter((id: any) => id != null) || [],
     })
     setDrawerOpen(true)
   }
 
   const handleSubmit = async (values: any) => {
+    // 清理 permission_ids：过滤 null/undefined，转换为数字
+    const rawPermissionIds = values.permission_ids || []
+    const cleanedPermissionIds = rawPermissionIds
+      .filter((id: any) => id != null && id !== '')
+      .map((id: any) => (typeof id === 'number' ? id : parseInt(id, 10)))
+      .filter((id: number) => !isNaN(id))
+
     const payload = {
-      ...values,
-      permission_ids: values.permission_ids || [],
+      name: values.name,
+      description: values.description,
+      data_scope: values.data_scope,
+      permission_ids: cleanedPermissionIds,
     }
+
+    console.log('[Roles] Submit payload:', JSON.stringify(payload))
+
     try {
       if (editingId) {
         await updateRole({ id: editingId, data: payload as RoleUpdate }).unwrap()
@@ -82,6 +94,7 @@ const Roles: React.FC = () => {
       setDrawerOpen(false)
       form.resetFields()
     } catch (err: any) {
+      console.error('[Roles] Submit error:', err)
       message.error(err?.data?.detail || '操作失败')
     }
   }
