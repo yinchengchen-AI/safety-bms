@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react'
-import { Table, Button, Space, Select, Input, message, Drawer, Form, Upload, Tag, Popconfirm, Modal } from 'antd'
+import { Table, Button, Space, Select, Input, message, Drawer, Form, Upload, Tag, Popconfirm, Modal, Switch } from 'antd'
 import { PlusOutlined, UploadOutlined, EyeOutlined } from '@ant-design/icons'
 import { PermissionButton } from '@/components/auth/PermissionButton'
 import { useListContractTemplatesQuery, useCreateContractTemplateMutation, useUploadContractTemplateFileMutation, useDeleteContractTemplateMutation, useLazyGetTemplateDownloadUrlQuery } from '@/store/api/contractTemplatesApi'
@@ -33,9 +33,9 @@ const ContractTemplates: React.FC = () => {
     return serviceTypesData?.items?.map((st) => ({ value: st.id, label: st.name })) || []
   }, [serviceTypesData])
 
-  const handleCreate = async (values: { name: string; service_type: number }) => {
+  const handleCreate = async (values: { name: string; service_type: number; is_default: boolean }) => {
     try {
-      const result = await createTemplate({ ...values, is_default: false }).unwrap()
+      const result = await createTemplate(values).unwrap()
       if (createFile && result.id) {
         await uploadTemplateFile({ id: result.id, file: createFile }).unwrap()
       }
@@ -145,6 +145,9 @@ const ContractTemplates: React.FC = () => {
               options={serviceTypeOptions}
               placeholder="请选择服务类型"
             />
+          </Form.Item>
+          <Form.Item name="is_default" label="默认模板" valuePropName="checked">
+            <Switch />
           </Form.Item>
           <Form.Item label="模板文件 (.docx)">
             <Upload
