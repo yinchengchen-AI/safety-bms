@@ -870,13 +870,10 @@ def get_customer_insights(
 
     region_expr = func.coalesce(
         func.nullif(
-            func.trim(
-                func.coalesce(Customer.city, "")
-                + func.case((Customer.district.isnot(None), Customer.district), else_="")
-            ),
+            func.trim(func.coalesce(Customer.city, "") + func.coalesce(Customer.district, "")),
             "",
         ),
-        func.coalesce(Customer.city, "未填写"),
+        "未填写",
     )
     region_query = db.query(
         region_expr.label("region"),
