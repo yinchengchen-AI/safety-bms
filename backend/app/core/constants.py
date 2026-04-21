@@ -14,6 +14,7 @@ class PermissionCode(StrEnum):
     CONTRACT_UPDATE = "contract:update"
     CONTRACT_DELETE = "contract:delete"
     CONTRACT_EXPORT = "contract:export"
+    CONTRACT_SIGN = "contract:sign"
     # service
     SERVICE_READ = "service:read"
     SERVICE_CREATE = "service:create"

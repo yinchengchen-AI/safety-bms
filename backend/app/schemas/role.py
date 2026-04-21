@@ -55,6 +55,20 @@ class RoleUpdate(BaseModel):
             return v.upper()
         return v
 
+    @field_validator("permission_ids", mode="before")
+    @classmethod
+    def _clean_permission_ids(cls, v):
+        if v is None:
+            return None
+        if isinstance(v, list):
+            # 过滤 null/undefined，将字符串数字转为整数
+            return [
+                int(x) if isinstance(x, str) and x.strip() != "" else x
+                for x in v
+                if x is not None and x != ""
+            ]
+        return v
+
 
 class RoleOut(RoleBase):
     id: int

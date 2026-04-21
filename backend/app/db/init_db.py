@@ -95,6 +95,11 @@ ROLE_DEFAULT_PERMISSIONS = {
 
 
 def init_db(db: Session) -> None:
+    # 先同步权限（确保权限表有数据）
+    from app.cli.sync_permissions import sync_permissions
+
+    sync_permissions(db)
+
     # 初始化角色
     for role_data in DEFAULT_ROLES:
         role = db.query(Role).filter(Role.name == role_data["name"]).first()
