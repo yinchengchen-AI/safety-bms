@@ -77,12 +77,18 @@ class MinIOService:
                 object_name,
                 expires=timedelta(seconds=expires_seconds),
             )
-            # 将内网地址替换为公网 nginx 代理地址
-            # nginx 会代理 /minio/ 到 MinIO，并保持 Host: minio:9000 头，使签名验证通过
-            public_url = url.replace(
-                f"http://{settings.MINIO_ENDPOINT}", "http://43.133.14.168:82/minio"
-            ).replace(f"https://{settings.MINIO_ENDPOINT}", "https://43.133.14.168:82/minio")
-            return public_url
+            # 如果配置了公网端点，替换为外部可访问的地址
+            # 例如 nginx 代理 http://example.com/minio/ → MinIO，并保持 Host: minio:9000 头
+            if settings.MINIO_PUBLIC_ENDPOINT:
+                public_url = url.replace(
+                    f"http://{settings.MINIO_ENDPOINT}",
+                    f"http://{settings.MINIO_PUBLIC_ENDPOINT}",
+                ).replace(
+                    f"https://{settings.MINIO_ENDPOINT}",
+                    f"https://{settings.MINIO_PUBLIC_ENDPOINT}",
+                )
+                return public_url
+            return url
         except S3Error as e:
             raise HTTPException(status_code=500, detail=f"生成下载链接失败: {str(e)}") from e
 
