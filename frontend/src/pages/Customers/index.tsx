@@ -153,6 +153,7 @@ const Customers: React.FC = () => {
       <Button type="link" onClick={() => setSelectedId(r.id)}>{name}</Button>
     )},
     { title: '行业', dataIndex: 'industry', key: 'industry' },
+    { title: '属地', key: 'region', render: (_: any, r: CustomerListItem) => [r.province, r.city, r.district, r.street].filter(Boolean).join('') || '-' },
     { title: '统一社会信用代码', dataIndex: 'credit_code', key: 'credit_code' },
     { title: '状态', dataIndex: 'status', key: 'status', render: (s: CustomerStatus) => (
       <Tag color={statusColors[s]}>{CustomerStatusLabels[s]}</Tag>
