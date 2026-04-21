@@ -49,10 +49,6 @@ export const contractsApi = baseApi.injectEndpoints({
       query: ({ id, attachmentId }) => ({ url: `/contracts/${id}/attachments/${attachmentId}`, method: 'DELETE' }),
       invalidatesTags: (_, __, { id }) => [{ type: 'Contract', id }, 'Contract'],
     }),
-    signContract: builder.mutation<Contract, { id: number; data: { party: string; signed_by: string; signature_base64: string } }>({
-      query: ({ id, data }) => ({ url: `/contracts/${id}/sign`, method: 'POST', body: data }),
-      invalidatesTags: (_, __, { id }) => [{ type: 'Contract', id }, 'Contract'],
-    }),
   }),
 })
 
@@ -68,5 +64,4 @@ export const {
   useUploadContractAttachmentFileMutation,
   useUploadContractAttachmentMutation,
   useDeleteContractAttachmentMutation,
-  useSignContractMutation,
 } = contractsApi

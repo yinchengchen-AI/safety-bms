@@ -164,7 +164,6 @@ class ContractOut(ContractBase):
     signed_at: datetime | None = None
     created_at: datetime
     customer_name: str | None = None
-    signatures: list[ContractSignatureOut] = Field(default_factory=list)
     attachments: list[ContractAttachmentOut] = Field(default_factory=list)
     # 统计字段（由service层计算）
     invoiced_amount: Decimal | None = None

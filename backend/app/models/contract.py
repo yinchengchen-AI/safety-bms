@@ -86,9 +86,6 @@ class Contract(Base, TimestampMixin, SoftDeleteMixin):
     changes = relationship(
         "ContractChange", back_populates="contract", cascade="all, delete-orphan"
     )
-    signatures = relationship(
-        "ContractSignature", back_populates="contract", cascade="all, delete-orphan"
-    )
     service_orders = relationship("ServiceOrder", back_populates="contract")
     invoices = relationship("Invoice", back_populates="contract")
     payments = relationship("Payment", back_populates="contract")
@@ -111,19 +108,6 @@ class ContractTemplate(Base, TimestampMixin):
 
     service_type_obj = relationship("ServiceType", foreign_keys=[service_type])
     contracts = relationship("Contract", back_populates="template")
-
-
-class ContractSignature(Base, TimestampMixin):
-    __tablename__ = "contract_signatures"
-
-    id = Column(Integer, primary_key=True, index=True)
-    contract_id = Column(Integer, ForeignKey("contracts.id", ondelete="CASCADE"), nullable=False)
-    party = Column(String(20), nullable=False, comment="签署方: party_a / party_b")
-    signed_by = Column(String(100), comment="签署人姓名")
-    signature_url = Column(String(500), nullable=False, comment="签名图片 MinIO 路径")
-    signed_at = Column(DateTime(timezone=True), nullable=False, comment="签署时间")
-
-    contract = relationship("Contract", back_populates="signatures")
 
 
 class ContractChange(Base, TimestampMixin):

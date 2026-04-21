@@ -172,15 +172,6 @@ export interface ContractAttachmentCreate {
   remark?: string
 }
 
-export interface ContractSignature {
-  id: number
-  contract_id: number
-  party: string
-  signed_by?: string
-  signature_url: string
-  signed_at: string
-}
-
 export interface Contract {
   id: number
   contract_no: string
@@ -205,7 +196,6 @@ export interface Contract {
   created_at: string
   invoiced_amount?: number
   received_amount?: number
-  signatures?: ContractSignature[]
   attachments?: ContractAttachment[]
 }
 
@@ -222,17 +212,6 @@ export interface ContractCreate {
   content?: string
   remark?: string
   template_id?: number
-}
-
-export interface ContractSignRequest {
-  party_a_name: string
-  party_a_signature_base64: string
-  party_b_name: string
-  party_b_signature_base64: string
-}
-
-export interface ContractUploadSignedRequest {
-  file_url: string
 }
 
 // ========== 服务工单 ==========

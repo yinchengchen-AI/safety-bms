@@ -44,7 +44,6 @@ ROLE_DEFAULT_PERMISSIONS = {
         PermissionCode.CONTRACT_UPDATE,
         PermissionCode.CONTRACT_DELETE,
         PermissionCode.CONTRACT_EXPORT,
-        PermissionCode.CONTRACT_SIGN,
         PermissionCode.SERVICE_READ,
         PermissionCode.SERVICE_CREATE,
         PermissionCode.SERVICE_UPDATE,
