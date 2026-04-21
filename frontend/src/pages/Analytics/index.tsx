@@ -246,6 +246,7 @@ const Analytics: React.FC = () => {
                           data={performanceData}
                           xField="name"
                           yField="amount"
+                          colorField="name"
                           height={300}
                           onReady={(plot) => {
                             plot.on('element:click', (event: any) => {
@@ -275,6 +276,7 @@ const Analytics: React.FC = () => {
                           data={agingData}
                           xField="range"
                           yField="amount"
+                          colorField="range"
                           height={280}
                           onReady={(plot) => {
                             plot.on('element:click', (event: any) => {
@@ -363,6 +365,7 @@ const Analytics: React.FC = () => {
                           data={customerRegionData}
                           xField="value"
                           yField="type"
+                          colorField="type"
                           height={260}
                           onReady={(plot) => {
                             plot.on('element:click', (event: any) => {
@@ -388,6 +391,7 @@ const Analytics: React.FC = () => {
                           data={serviceTypeData}
                           xField="type"
                           yField="value"
+                          colorField="type"
                           height={260}
                           onReady={(plot) => {
                             plot.on('element:click', (event: any) => {

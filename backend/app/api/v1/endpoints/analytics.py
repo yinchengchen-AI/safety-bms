@@ -7,8 +7,6 @@ from sqlalchemy import and_, case, extract, func
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.constants import (
-    ContractStatus,
-    InvoiceStatus,
     PermissionCode,
     ServiceOrderStatus,
 )
@@ -40,6 +38,11 @@ from app.schemas.analytics import (
     ServiceEfficiencyOut,
     ServiceEfficiencyTrendItemOut,
     ServiceTypeDistributionItemOut,
+)
+from app.utils.analytics_helpers import (
+    filter_signed_contracts,
+    filter_valid_invoices,
+    filter_valid_payments,
 )
 from app.utils.data_scope import apply_data_scope
 from app.utils.enum_format import enum_value
@@ -83,13 +86,7 @@ def _apply_contract_filters(
     date_to: date | None,
     service_type: int | None,
 ):
-    query = query.filter(
-        Contract.is_deleted == False,
-        Contract.sign_date.isnot(None),
-        Contract.status.in_(
-            [ContractStatus.ACTIVE, ContractStatus.SIGNED, ContractStatus.COMPLETED]
-        ),
-    )
+    query = filter_signed_contracts(query)
     if date_from:
         query = query.filter(Contract.sign_date >= date_from)
     if date_to:
@@ -107,7 +104,7 @@ def _apply_invoice_filters(
     service_type: int | None,
 ):
     invoice_metric_date = _invoice_metric_date_expr()
-    query = query.filter(Invoice.status.in_([InvoiceStatus.ISSUED, InvoiceStatus.SENT]))
+    query = filter_valid_invoices(query)
     if service_type:
         query = query.join(Contract, Invoice.contract_id == Contract.id).filter(
             Contract.service_type == service_type
@@ -126,10 +123,9 @@ def _apply_payment_filters(
     date_to: date | None,
     service_type: int | None,
 ):
+    query = filter_valid_payments(query)
     if service_type:
-        query = query.join(Contract, Payment.contract_id == Contract.id).filter(
-            Contract.service_type == service_type
-        )
+        query = query.filter(Contract.service_type == service_type)
     if date_from:
         query = query.filter(Payment.payment_date >= date_from)
     if date_to:
@@ -316,6 +312,7 @@ def _build_drilldown_rows(
                     func.coalesce(func.sum(Payment.amount), 0).label("total"),
                 )
                 .filter(Payment.contract_id.in_(contract_ids))
+                .filter(Payment.is_deleted == False)
                 .group_by(Payment.contract_id)
                 .all()
             )
@@ -479,7 +476,7 @@ def get_analytics_overview(
     date_from: date | None = None,
     date_to: date | None = None,
     service_type: int | None = None,
-    current_user: User = Depends(require_permissions(PermissionCode.ANALYTICS_READ.value)),
+    current_user: User = Depends(require_permissions(PermissionCode.ANALYTICS_READ)),
     db: Session = Depends(get_db),
 ):
     signed_query = db.query(func.coalesce(func.sum(Contract.total_amount), 0))
@@ -549,7 +546,7 @@ def get_revenue_trend(
     date_from: date | None = None,
     date_to: date | None = None,
     service_type: int | None = None,
-    current_user: User = Depends(require_permissions(PermissionCode.ANALYTICS_READ.value)),
+    current_user: User = Depends(require_permissions(PermissionCode.ANALYTICS_READ)),
     db: Session = Depends(get_db),
 ):
     invoice_metric_date = _invoice_metric_date_expr()
@@ -649,7 +646,7 @@ def get_performance_ranking(
     date_to: date | None = None,
     service_type: int | None = None,
     limit: int = Query(10, ge=1, le=50),
-    current_user: User = Depends(require_permissions(PermissionCode.ANALYTICS_READ.value)),
+    current_user: User = Depends(require_permissions(PermissionCode.ANALYTICS_READ)),
     db: Session = Depends(get_db),
 ):
     ranking_map: dict[int, PerformanceRankingItemOut] = {}
@@ -745,7 +742,7 @@ def get_receivable_aging(
     date_from: date | None = None,
     date_to: date | None = None,
     service_type: int | None = None,
-    current_user: User = Depends(require_permissions(PermissionCode.ANALYTICS_READ.value)),
+    current_user: User = Depends(require_permissions(PermissionCode.ANALYTICS_READ)),
     db: Session = Depends(get_db),
 ):
     contract_query = db.query(Contract)
@@ -763,6 +760,7 @@ def get_receivable_aging(
                 func.coalesce(func.sum(Payment.amount), 0).label("total"),
             )
             .filter(Payment.contract_id.in_(contract_ids))
+            .filter(Payment.is_deleted == False)
             .group_by(Payment.contract_id)
             .all()
         )
@@ -823,7 +821,7 @@ def get_receivable_aging(
 def get_customer_insights(
     date_from: date | None = None,
     date_to: date | None = None,
-    current_user: User = Depends(require_permissions(PermissionCode.ANALYTICS_READ.value)),
+    current_user: User = Depends(require_permissions(PermissionCode.ANALYTICS_READ)),
     db: Session = Depends(get_db),
 ):
     growth_query = db.query(
@@ -919,7 +917,7 @@ def get_service_efficiency(
     date_from: date | None = None,
     date_to: date | None = None,
     service_type: int | None = None,
-    current_user: User = Depends(require_permissions(PermissionCode.ANALYTICS_READ.value)),
+    current_user: User = Depends(require_permissions(PermissionCode.ANALYTICS_READ)),
     db: Session = Depends(get_db),
 ):
     today = date.today()
@@ -1037,7 +1035,7 @@ def get_analytics_drilldown(
     date_from: date | None = None,
     date_to: date | None = None,
     service_type: int | None = None,
-    current_user: User = Depends(require_permissions(PermissionCode.ANALYTICS_READ.value)),
+    current_user: User = Depends(require_permissions(PermissionCode.ANALYTICS_READ)),
     db: Session = Depends(get_db),
 ):
     items = _build_drilldown_rows(
@@ -1063,7 +1061,7 @@ def export_analytics_drilldown(
     date_from: date | None = None,
     date_to: date | None = None,
     service_type: int | None = None,
-    current_user: User = Depends(require_permissions(PermissionCode.ANALYTICS_READ.value)),
+    current_user: User = Depends(require_permissions(PermissionCode.ANALYTICS_READ)),
     db: Session = Depends(get_db),
 ):
     items = _build_drilldown_rows(

@@ -6,7 +6,6 @@ from app.db.base import Base  # noqa: F401
 from app.models.contract import (  # noqa: F401
     Contract,
     ContractChange,
-    ContractSignature,
     ContractTemplate,
 )
 from app.models.customer import Customer, CustomerContact, CustomerFollowUp  # noqa: F401

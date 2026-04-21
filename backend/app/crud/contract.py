@@ -1,16 +1,14 @@
 from datetime import UTC
 from decimal import Decimal
 
-from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
-from app.core.constants import ContractStatus, InvoiceStatus
+from app.core.constants import ContractStatus
 from app.core.exceptions import ContractStatusError
 from app.crud.base import CRUDBase
 from app.models.contract import Contract, ContractAttachment, ContractChange, ContractTemplate
-from app.models.invoice import Invoice
-from app.models.payment import Payment
 from app.schemas.contract import ContractCreate, ContractTemplateCreate, ContractUpdate
+from app.services.contract_amount_service import get_invoiced_amount, get_received_amount
 
 ALLOWED_TRANSITIONS = {
     ContractStatus.DRAFT: {ContractStatus.SIGNED, ContractStatus.TERMINATED},
@@ -98,27 +96,10 @@ class CRUDContract(CRUDBase[Contract, ContractCreate, ContractUpdate]):
         return db_obj
 
     def get_invoiced_amount(self, db: Session, *, contract_id: int) -> Decimal:
-        contract = db.query(Contract).filter(Contract.id == contract_id).first()
-        if not contract or contract.is_deleted:
-            return Decimal("0")
-        result = (
-            db.query(func.coalesce(func.sum(Invoice.amount), 0))
-            .filter(Invoice.contract_id == contract_id)
-            .filter(Invoice.status.in_([InvoiceStatus.ISSUED, InvoiceStatus.SENT]))
-            .scalar()
-        )
-        return Decimal(str(result))
+        return get_invoiced_amount(db, contract_id)
 
     def get_received_amount(self, db: Session, *, contract_id: int) -> Decimal:
-        contract = db.query(Contract).filter(Contract.id == contract_id).first()
-        if not contract or contract.is_deleted:
-            return Decimal("0")
-        result = (
-            db.query(func.coalesce(func.sum(Payment.amount), 0))
-            .filter(Payment.contract_id == contract_id)
-            .scalar()
-        )
-        return Decimal(str(result))
+        return get_received_amount(db, contract_id)
 
     def soft_delete(self, db: Session, *, contract_id: int) -> None:
         from datetime import datetime

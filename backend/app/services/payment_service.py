@@ -9,6 +9,11 @@ from app.models.contract import Contract
 from app.models.invoice import Invoice
 from app.models.payment import Payment
 from app.schemas.payment import ContractReceivable, PaymentCreate
+from app.services.contract_amount_service import (
+    get_available_payment_amount,
+    get_available_payment_for_invoice,
+)
+from app.utils.analytics_helpers import filter_signed_contracts
 
 
 class PaymentService:
@@ -25,9 +30,8 @@ class PaymentService:
         # 对已有收款记录加锁，防止并发超收
         db.query(Payment).filter(Payment.contract_id == contract.id).with_for_update().all()
 
-        received = crud_payment.get_sum_by_contract(db, contract_id=contract.id)
-        if received + obj_in.amount > contract.total_amount:
-            available = contract.total_amount - received
+        available = get_available_payment_amount(db, contract_id=contract.id)
+        if obj_in.amount > available:
             raise PaymentAmountExceededError(
                 available=available,
                 requested=obj_in.amount,
@@ -40,10 +44,10 @@ class PaymentService:
                 raise NotFoundError("发票")
             if invoice.contract_id != contract.id:
                 raise BusinessError("关联发票不属于该合同")
-            paid_for_invoice = crud_payment.get_sum_by_invoice(db, invoice_id=invoice.id)
-            if paid_for_invoice + obj_in.amount > invoice.amount:
+            available_for_invoice = get_available_payment_for_invoice(db, invoice_id=invoice.id)
+            if obj_in.amount > available_for_invoice:
                 raise BusinessError(
-                    f"收款金额({float(obj_in.amount):.2f})超过关联发票可收余额({float(invoice.amount - paid_for_invoice):.2f})"
+                    f"收款金额({float(obj_in.amount):.2f})超过关联发票可收余额({float(available_for_invoice):.2f})"
                 )
 
         return crud_payment.create(db, obj_in=obj_in, created_by=created_by)
@@ -72,17 +76,9 @@ class PaymentService:
         )
 
     def get_overdue_contracts(self, db: Session) -> list[ContractReceivable]:
-        from app.core.constants import ContractStatus
-
         contracts = (
-            db.query(Contract)
-            .filter(
-                Contract.is_deleted == False,
-                Contract.status.in_(
-                    [ContractStatus.SIGNED, ContractStatus.EXECUTING, ContractStatus.COMPLETED]
-                ),
-                Contract.end_date < date.today(),
-            )
+            filter_signed_contracts(db.query(Contract))
+            .filter(Contract.end_date < date.today())
             .all()
         )
         if not contracts:

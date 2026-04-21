@@ -21,7 +21,7 @@ def list_contract_templates(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=200),
     service_type: int | None = None,
-    current_user: User = Depends(require_permissions(PermissionCode.CONTRACT_UPDATE)),
+    current_user: User = Depends(require_permissions(PermissionCode.CONTRACT_READ)),
     db: Session = Depends(get_db),
 ):
     skip = (page - 1) * page_size
@@ -44,7 +44,7 @@ def list_contract_templates(
 @router.post("", response_model=ContractTemplateOut, status_code=201)
 def create_contract_template(
     body: ContractTemplateCreate,
-    current_user: User = Depends(require_permissions(PermissionCode.CONTRACT_UPDATE)),
+    current_user: User = Depends(require_permissions(PermissionCode.CONTRACT_CREATE)),
     db: Session = Depends(get_db),
 ):
     return crud_contract_template.create(db, obj_in=body, created_by=current_user.id)
@@ -68,7 +68,7 @@ def upload_template_file(
 @router.get("/{template_id}/download-url")
 def get_template_download_url(
     template_id: int,
-    current_user: User = Depends(require_permissions(PermissionCode.CONTRACT_UPDATE)),
+    current_user: User = Depends(require_permissions(PermissionCode.CONTRACT_READ)),
     db: Session = Depends(get_db),
 ):
     template = crud_contract_template.get(db, id=template_id)
@@ -81,7 +81,7 @@ def get_template_download_url(
 @router.delete("/{template_id}", response_model=ResponseMsg)
 def delete_contract_template(
     template_id: int,
-    current_user: User = Depends(require_permissions(PermissionCode.CONTRACT_UPDATE)),
+    current_user: User = Depends(require_permissions(PermissionCode.CONTRACT_DELETE)),
     db: Session = Depends(get_db),
 ):
     template = crud_contract_template.get(db, id=template_id)

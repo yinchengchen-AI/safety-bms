@@ -68,6 +68,7 @@ def _get_service_order_with_relations(db: Session, order_id: int) -> ServiceOrde
         .options(
             joinedload(ServiceOrder.contract).joinedload(Contract.customer),
             joinedload(ServiceOrder.assignee),
+            joinedload(ServiceOrder.service_type_obj),
         )
         .filter(ServiceOrder.id == order_id)
         .first()
@@ -101,6 +102,7 @@ def list_service_orders(
         query.options(
             joinedload(ServiceOrder.contract).joinedload(Contract.customer),
             joinedload(ServiceOrder.assignee),
+            joinedload(ServiceOrder.service_type_obj),
         )
         .order_by(ServiceOrder.created_at.desc())
         .offset(skip)
@@ -135,6 +137,7 @@ def export_service_orders(
         query.options(
             joinedload(ServiceOrder.contract).joinedload(Contract.customer),
             joinedload(ServiceOrder.assignee),
+            joinedload(ServiceOrder.service_type_obj),
         )
         .order_by(ServiceOrder.created_at.desc())
         .all()
@@ -394,7 +397,7 @@ def delete_service_report(
 @router.delete("/{order_id}")
 def delete_service_order(
     order_id: int,
-    current_user: User = Depends(require_permissions(PermissionCode.SERVICE_UPDATE)),
+    current_user: User = Depends(require_permissions(PermissionCode.SERVICE_DELETE)),
     db: Session = Depends(get_db),
 ):
     order = crud_service.get(db, id=order_id)

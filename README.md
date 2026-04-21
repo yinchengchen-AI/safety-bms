@@ -130,7 +130,7 @@ npm run dev
 
 | 用户名 | 密码 | 角色 |
 |--------|------|------|
-| admin | Admin@123456 | 超级管理员 |
+| admin | admin123 | 超级管理员 |
 
 ## 系统模块
 
@@ -141,8 +141,8 @@ npm run dev
 | 客户管理 | 客户信息、联系人、跟进记录 |
 | 合同管理 | 合同全生命周期管理（草稿→审核→生效→完成）|
 | 服务管理 | 服务工单（5种服务类型）管理与进度跟踪 |
-| 开票管理 | 开票申请 / 审核 / 驳回 / 已寄出，自动校验可开票余额 |
-| 收款管理 | 收款记录 + 逾期应收预警 |
+| 开票管理 | 开票申请 / 审核 / 驳回 / 已寄出 / 删除，自动校验可开票余额 |
+| 收款管理 | 收款记录（新增/编辑/删除）+ 逾期应收预警，编辑时校验可收款余额 |
 | 用户管理 | 用户 CRUD + RBAC 角色管理（仅管理员）|
 
 ## 业务角色
@@ -176,15 +176,68 @@ npm run dev
 - 审核驳回时必须填写：驳回原因
 - 开票申请与审核通过前都会校验合同可开票余额，避免累计开票金额超过合同总额
 
+## 生产部署
+
+### 一键部署
+
+```bash
+cp .env.example .env
+# 编辑 .env，设置强密码和 SECRET_KEY
+docker compose up -d --build
+```
+
+### 生产环境关键配置
+
+1. **`.env` 必改项**：
+   - `SECRET_KEY`：至少 32 位随机字符串
+   - `DB_PASSWORD`：强密码
+   - `ALLOWED_ORIGINS`：精确设置为你的域名，如 `["https://bms.yourcompany.com"]`
+   - `DEBUG=false`
+
+2. **HTTPS / TLS**：
+   - 准备 SSL 证书放到 `./ssl/` 目录（`cert.pem` 和 `key.pem`）
+   - 使用生产扩展配置启动：
+     ```bash
+     docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+     ```
+
+3. **数据库自动备份**：
+   - `docker-compose.yml` 已包含 `postgres-backup` 服务
+   - 备份文件保存在 `./backups/` 目录
+   - 默认保留策略：7 天每日备份 + 4 周每周备份 + 6 月每月备份
+
+4. **运行时环境变量（前端）**：
+   - 前端支持通过 `API_BASE_URL` 运行时切换 API 地址
+   - 默认通过 nginx 反向代理同域访问 `/api/v1`
+   - 如需跨域部署：
+     ```bash
+     docker run -e API_BASE_URL=https://api.example.com ...
+     ```
+
+### 生产架构特点
+
+| 特性 | 说明 |
+|------|------|
+| WSGI 服务器 | gunicorn + 4 uvicorn workers |
+| 自动初始化 | `backend-init` 服务自动执行 `alembic upgrade head` 和 `init_db.py` |
+| 分布式锁 | 调度器通过 Redis 分布式锁防止多实例重复触发定时任务 |
+| 日志格式 | DEBUG=false 时输出 JSON 结构化日志 |
+| 文档隐藏 | 生产环境自动关闭 `/api/docs`、`/api/redoc`、`/api/openapi.json` |
+| 连接池 | SQLAlchemy pool_size=10, max_overflow=20, pool_recycle=3600s |
+
 ## 业务逻辑约束
 
-- **开票校验**: 累计开票金额不得超过合同总额
-- **开票统计口径**: 仪表盘与统计分析中的开票额仅统计 `issued` / `sent` 状态发票，并优先按 `invoice_date` 归档；缺失时回退到 `created_at`
-- **合同统计口径**: 统计分析中的签约额统一按 `sign_date` 统计
+- **开票校验**: 累计开票金额不得超过合同总额；创建、编辑、审核通过前均会校验
+- **收款校验**: 累计收款金额不得超过合同总额；若关联发票，不得超过发票金额；创建和编辑均会校验
+- **开票删除保护**: `issued` / `sent` 状态的发票若已有关联收款，禁止删除
+- **统计口径统一**:
+  - 签约额：仅统计 `signed` / `executing` / `completed` 状态且 `sign_date` 不为空的合同
+  - 开票额：仅统计 `issued` / `sent` 状态的发票
+  - 收款额：仅统计未删除且关联合同满足签约口径的收款记录
 - **权限口径**: 菜单、路由守卫和后端接口统一按入口权限控制，例如 `/analytics` 需要 `analytics:read`
 - **标签展示**: 仪表盘和统计分析中的状态/类型图表优先展示中文标签映射
 - **逾期判断**: 合同到期且应收余额 > 0 → 标记逾期
-- **软删除**: 客户和合同使用软删除（`is_deleted` 标记）
-- **合同状态机**: 每次状态变更自动记录变更历史
+- **软删除**: 客户、合同、发票、收款均使用软删除（`is_deleted` 标记），删除后数据保留可审计
+- **合同状态机**: 每次状态变更自动记录变更历史；终止合同仅要求无未完成工单，不再要求无开票/收款记录
 - **JWT 安全**: 退出登录后 Token 加入 Redis 黑名单即时失效
 # safety-bms

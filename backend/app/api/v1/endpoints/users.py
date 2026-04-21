@@ -11,7 +11,7 @@ from app.models.user import User
 from app.schemas.common import FileUploadResponse, PageResponse, ResponseMsg
 from app.schemas.user import PasswordChange, PasswordReset, RoleOut, UserCreate, UserOut, UserUpdate
 from app.services.minio_service import minio_service
-from app.utils.data_scope import check_data_scope
+from app.utils.data_scope import apply_data_scope, check_data_scope
 from app.utils.excel_export import export_excel_response
 from app.utils.export_mappings import USER_ROLE_MAP, map_value
 from app.utils.pagination import make_page_response
@@ -25,13 +25,18 @@ def list_users(
     page_size: int = Query(20, ge=1, le=200),
     is_active: bool | None = None,
     department_id: int | None = None,
-    _: User = Depends(require_permissions(PermissionCode.USER_READ.value)),
+    current_user: User = Depends(require_permissions(PermissionCode.USER_READ)),
     db: Session = Depends(get_db),
 ):
     skip = (page - 1) * page_size
-    total, items = crud_user.get_multi(
-        db, skip=skip, limit=page_size, is_active=is_active, department_id=department_id
-    )
+    query = db.query(User)
+    if is_active is not None:
+        query = query.filter(User.is_active == is_active)
+    if department_id is not None:
+        query = query.filter(User.department_id == department_id)
+    query = apply_data_scope(query, User, current_user)
+    total = query.count()
+    items = query.offset(skip).limit(page_size).all()
     return make_page_response(total, items, page, page_size)
 
 
@@ -40,7 +45,7 @@ def export_users(
     is_active: bool | None = None,
     department_id: int | None = None,
     keyword: str | None = None,
-    _: User = Depends(require_permissions(PermissionCode.USER_READ.value)),
+    current_user: User = Depends(require_permissions(PermissionCode.USER_READ)),
     db: Session = Depends(get_db),
 ):
     query = db.query(User)
@@ -54,6 +59,7 @@ def export_users(
             | (User.full_name.ilike(f"%{keyword}%"))
             | (User.email.ilike(f"%{keyword}%"))
         )
+    query = apply_data_scope(query, User, current_user)
     items = query.order_by(User.created_at.desc()).all()
     headers = ["用户名", "姓名", "邮箱", "手机号", "部门", "状态", "角色", "创建时间"]
     rows = []
@@ -80,7 +86,7 @@ def export_users(
 @router.post("", response_model=UserOut, status_code=201)
 def create_user(
     body: UserCreate,
-    _: User = Depends(require_permissions(PermissionCode.USER_CREATE.value)),
+    _: User = Depends(require_permissions(PermissionCode.USER_CREATE)),
     db: Session = Depends(get_db),
 ):
     if crud_user.get_by_username(db, username=body.username):
@@ -92,7 +98,7 @@ def create_user(
 
 @router.get("/roles", response_model=list[RoleOut])
 def list_roles(
-    _: User = Depends(require_permissions(PermissionCode.ROLE_READ.value)),
+    _: User = Depends(require_permissions(PermissionCode.ROLE_READ)),
     db: Session = Depends(get_db),
 ):
     return crud_user.get_all_roles(db)
@@ -148,7 +154,7 @@ def change_current_user_password(
 @router.get("/{user_id}", response_model=UserOut)
 def get_user(
     user_id: int,
-    current_user: User = Depends(require_permissions(PermissionCode.USER_READ.value)),
+    current_user: User = Depends(require_permissions(PermissionCode.USER_READ)),
     db: Session = Depends(get_db),
 ):
     user = crud_user.get(db, id=user_id)
@@ -163,7 +169,7 @@ def get_user(
 def update_user(
     user_id: int,
     body: UserUpdate,
-    current_user: User = Depends(require_permissions(PermissionCode.USER_UPDATE.value)),
+    current_user: User = Depends(require_permissions(PermissionCode.USER_UPDATE)),
     db: Session = Depends(get_db),
 ):
     if user_id == current_user.id:
@@ -182,7 +188,7 @@ def update_user(
 @router.delete("/{user_id}", response_model=ResponseMsg)
 def delete_user(
     user_id: int,
-    current_user: User = Depends(require_permissions(PermissionCode.USER_DELETE.value)),
+    current_user: User = Depends(require_permissions(PermissionCode.USER_DELETE)),
     db: Session = Depends(get_db),
 ):
     if user_id == current_user.id:
@@ -200,7 +206,7 @@ def delete_user(
 def reset_user_password(
     user_id: int,
     body: PasswordReset,
-    current_user: User = Depends(require_permissions(PermissionCode.USER_UPDATE.value)),
+    current_user: User = Depends(require_permissions(PermissionCode.USER_UPDATE)),
     db: Session = Depends(get_db),
 ):
     """管理员重置指定用户密码"""

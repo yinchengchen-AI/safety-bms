@@ -8,8 +8,9 @@ from app.db.session import get_db
 from app.dependencies import require_permissions
 from app.models.contract import Contract
 from app.models.invoice import Invoice
+from app.models.payment import Payment
 from app.models.user import User
-from app.schemas.common import FileUploadResponse, PageResponse
+from app.schemas.common import FileUploadResponse, PageResponse, ResponseMsg
 from app.schemas.invoice import (
     InvoiceAuditRequest,
     InvoiceCreate,
@@ -43,6 +44,7 @@ def list_invoices(
         db.query(Invoice)
         .join(Contract, Invoice.contract_id == Contract.id)
         .filter(Contract.is_deleted == False)
+        .filter(Invoice.is_deleted == False)
     )
     if contract_id:
         query = query.filter(Invoice.contract_id == contract_id)
@@ -81,6 +83,7 @@ def export_invoices(
         db.query(Invoice)
         .join(Contract, Invoice.contract_id == Contract.id)
         .filter(Contract.is_deleted == False)
+        .filter(Invoice.is_deleted == False)
     )
     if contract_id:
         query = query.filter(Invoice.contract_id == contract_id)
@@ -165,6 +168,40 @@ def update_invoice(
     # 禁止直接修改为已开票/已寄出状态，必须通过审核接口
     if body.status is not None and body.status in (InvoiceStatus.ISSUED, InvoiceStatus.SENT):
         raise BusinessError("禁止直接修改为已开票或已寄出状态，请通过审核接口")
+    # 禁止更换关联合同
+    if body.contract_id is not None and body.contract_id != invoice.contract_id:
+        raise BusinessError("编辑发票时不允许更换关联合同")
+    # 若修改了金额，校验不超可开票余额
+    if body.amount is not None or body.contract_id is not None:
+        contract_id_for_check = (
+            body.contract_id if body.contract_id is not None else invoice.contract_id
+        )
+        amount_for_check = body.amount if body.amount is not None else invoice.amount
+        contract = (
+            db.query(Contract)
+            .filter(Contract.id == contract_id_for_check, Contract.is_deleted == False)
+            .with_for_update()
+            .first()
+        )
+        if not contract:
+            raise NotFoundError("合同")
+        db.query(Invoice).filter(
+            Invoice.contract_id == contract_id_for_check
+        ).with_for_update().all()
+        already_invoiced = crud_invoice.get_sum_by_contract(db, contract_id=contract_id_for_check)
+        from decimal import Decimal
+
+        available = Decimal(str(getattr(contract, "total_amount", 0) or 0)) - already_invoiced
+        # 同一合同且原发票已计入已开票金额时，需将原金额加回可用额度
+        if (
+            body.contract_id is None or body.contract_id == invoice.contract_id
+        ) and invoice.status in (InvoiceStatus.ISSUED, InvoiceStatus.SENT):
+            available += Decimal(str(getattr(invoice, "amount", 0) or 0))
+        if amount_for_check > available:
+            from app.core.exceptions import InvoiceAmountExceededError
+
+            raise InvoiceAmountExceededError(available=available, requested=amount_for_check)
+
     updated = crud_invoice.update(db, db_obj=invoice, obj_in=body)
     if (
         body.status is not None
@@ -280,6 +317,30 @@ def upload_invoice_file(
     result = minio_service.upload_file(file, prefix=f"invoices/{invoice_id}")
     crud_invoice.update(db, db_obj=invoice, obj_in={"file_url": result["file_url"]})
     return result
+
+
+@router.delete("/{invoice_id}", response_model=ResponseMsg)
+def delete_invoice(
+    invoice_id: int,
+    current_user: User = Depends(require_permissions(PermissionCode.INVOICE_DELETE)),
+    db: Session = Depends(get_db),
+):
+    invoice = crud_invoice.get(db, id=invoice_id)
+    if not invoice:
+        raise NotFoundError("发票")
+    if not check_data_scope(invoice, current_user):
+        raise PermissionDeniedError()
+    # ISSUED/SENT 状态且已有关联收款，禁止删除以保护金额一致性
+    if invoice.status in (InvoiceStatus.ISSUED, InvoiceStatus.SENT):
+        has_payments = (
+            db.query(Payment)
+            .filter(Payment.invoice_id == invoice_id, Payment.is_deleted == False)
+            .first()
+        )
+        if has_payments:
+            raise BusinessError("该发票已有关联收款记录，不可删除")
+    crud_invoice.remove(db, id=invoice_id)
+    return {"message": "删除成功"}
 
 
 @router.get("/{invoice_id}/download-url")

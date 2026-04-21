@@ -92,7 +92,7 @@ def _to_int(value) -> int:
 
 @router.get("", response_model=list[ReportMetaOut])
 def list_reports(
-    _current_user: User = Depends(require_permissions(PermissionCode.REPORT_READ.value)),
+    _current_user: User = Depends(require_permissions(PermissionCode.REPORT_READ)),
 ):
     return [ReportMetaOut(**meta) for meta in REPORTS_META]
 
@@ -105,7 +105,7 @@ def contract_execution_report(
     date_to: date | None = None,
     service_type: int | None = None,
     status: str | None = None,
-    current_user: User = Depends(require_permissions(PermissionCode.REPORT_READ.value)),
+    current_user: User = Depends(require_permissions(PermissionCode.REPORT_READ)),
     db: Session = Depends(get_db),
 ):
     invoiced_sub = (
@@ -180,7 +180,7 @@ def service_order_completion_report(
     date_to: date | None = None,
     service_type: int | None = None,
     status: str | None = None,
-    current_user: User = Depends(require_permissions(PermissionCode.REPORT_READ.value)),
+    current_user: User = Depends(require_permissions(PermissionCode.REPORT_READ)),
     db: Session = Depends(get_db),
 ):
     query = (
@@ -248,7 +248,7 @@ def customer_payment_analysis_report(
     page_size: int = Query(20, ge=1, le=100),
     date_from: date | None = None,
     date_to: date | None = None,
-    current_user: User = Depends(require_permissions(PermissionCode.REPORT_READ.value)),
+    current_user: User = Depends(require_permissions(PermissionCode.REPORT_READ)),
     db: Session = Depends(get_db),
 ):
     contract_sub = (
@@ -336,7 +336,7 @@ def invoice_detail_report(
     date_from: date | None = None,
     date_to: date | None = None,
     status: str | None = None,
-    current_user: User = Depends(require_permissions(PermissionCode.REPORT_READ.value)),
+    current_user: User = Depends(require_permissions(PermissionCode.REPORT_READ)),
     db: Session = Depends(get_db),
 ):
     query = (
@@ -395,7 +395,7 @@ def payment_detail_report(
     date_from: date | None = None,
     date_to: date | None = None,
     payment_method: str | None = None,
-    current_user: User = Depends(require_permissions(PermissionCode.REPORT_READ.value)),
+    current_user: User = Depends(require_permissions(PermissionCode.REPORT_READ)),
     db: Session = Depends(get_db),
 ):
     query = (
@@ -453,7 +453,7 @@ def customer_ledger_summary_report(
     date_from: date | None = None,
     date_to: date | None = None,
     status: str | None = None,
-    current_user: User = Depends(require_permissions(PermissionCode.REPORT_READ.value)),
+    current_user: User = Depends(require_permissions(PermissionCode.REPORT_READ)),
     db: Session = Depends(get_db),
 ):
     contract_sub = (
@@ -542,7 +542,7 @@ def export_report(
     service_type: int | None = None,
     status: str | None = None,
     payment_method: str | None = None,
-    current_user: User = Depends(require_permissions(PermissionCode.REPORT_READ.value)),
+    current_user: User = Depends(require_permissions(PermissionCode.REPORT_READ)),
     db: Session = Depends(get_db),
 ):
     if report_id == "contract-execution":

@@ -27,7 +27,7 @@ class CRUDPayment(CRUDBase[Payment, PaymentCreate, PaymentUpdate]):
         contract_id: int | None = None,
         invoice_id: int | None = None,
     ) -> tuple[int, list[Payment]]:
-        query = db.query(Payment)
+        query = db.query(Payment).filter(Payment.is_deleted == False)
         if contract_id:
             query = query.filter(Payment.contract_id == contract_id)
         if invoice_id:
@@ -40,6 +40,7 @@ class CRUDPayment(CRUDBase[Payment, PaymentCreate, PaymentUpdate]):
         result = (
             db.query(func.coalesce(func.sum(Payment.amount), 0))
             .filter(Payment.contract_id == contract_id)
+            .filter(Payment.is_deleted == False)
             .scalar()
         )
         return Decimal(str(result))
@@ -48,6 +49,7 @@ class CRUDPayment(CRUDBase[Payment, PaymentCreate, PaymentUpdate]):
         result = (
             db.query(func.coalesce(func.sum(Payment.amount), 0))
             .filter(Payment.invoice_id == invoice_id)
+            .filter(Payment.is_deleted == False)
             .scalar()
         )
         return Decimal(str(result))
@@ -58,6 +60,7 @@ class CRUDPayment(CRUDBase[Payment, PaymentCreate, PaymentUpdate]):
         results = (
             db.query(Payment.contract_id, func.coalesce(func.sum(Payment.amount), 0).label("total"))
             .filter(Payment.contract_id.in_(contract_ids))
+            .filter(Payment.is_deleted == False)
             .group_by(Payment.contract_id)
             .all()
         )
@@ -73,6 +76,7 @@ class CRUDPayment(CRUDBase[Payment, PaymentCreate, PaymentUpdate]):
                 func.sum(Payment.amount).label("total"),
             )
             .filter(extract("year", Payment.payment_date) == year)
+            .filter(Payment.is_deleted == False)
             .group_by(extract("month", Payment.payment_date))
             .order_by(extract("month", Payment.payment_date))
             .all()

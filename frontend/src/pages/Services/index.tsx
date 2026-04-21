@@ -4,6 +4,7 @@ import type { UploadProps } from 'antd'
 import { PlusOutlined, DeleteOutlined, EditOutlined, UploadOutlined, DownloadOutlined } from '@ant-design/icons'
 import { useListServiceOrdersQuery, useCreateServiceOrderMutation, useUpdateServiceStatusMutation, useGetServiceOrderQuery, useUpdateServiceOrderMutation, useDeleteServiceOrderMutation, useCreateServiceItemMutation, useUpdateServiceItemMutation, useDeleteServiceItemMutation, useDeleteServiceReportMutation } from '@/store/api/servicesApi'
 import { useListContractsQuery } from '@/store/api/contractsApi'
+import { useListUsersQuery } from '@/store/api/usersApi'
 import { ServiceOrderStatusLabels, formatDateTime } from '@/utils/constants'
 import type { ServiceOrder, ServiceOrderStatus, ServiceItem } from '@/types'
 import dayjs from 'dayjs'
@@ -14,6 +15,7 @@ interface ServiceFormValues {
   contract_id: number
   service_type: number
   title: string
+  assignee_id?: number
   planned_start?: Dayjs
   planned_end?: Dayjs
   remark?: string
@@ -38,6 +40,7 @@ const Services: React.FC = () => {
   const [createOpen, setCreateOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
   const [detailId, setDetailId] = useState<number | null>(null)
+  const [editingId, setEditingId] = useState<number | null>(null)
   const [form] = Form.useForm()
   const [editForm] = Form.useForm()
 
@@ -50,6 +53,11 @@ const Services: React.FC = () => {
     return contractsData?.items.filter(c => ['signed', 'executing', 'completed'].includes(c.status)) || []
   }, [contractsData])
   const { data: serviceTypesData } = useListServiceTypesQuery({ page_size: 200 })
+  const { data: usersData } = useListUsersQuery({ page: 1, page_size: 200, is_active: true })
+
+  const userOptions = React.useMemo(() => {
+    return usersData?.items?.map((u) => ({ value: u.id, label: u.full_name || u.username })) || []
+  }, [usersData])
 
   const serviceTypeMap = React.useMemo(() => {
     const map = new Map<number, string>()
@@ -78,14 +86,14 @@ const Services: React.FC = () => {
   }
 
   const handleEdit = async (values: ServiceFormValues) => {
-    if (!detailId) return
+    if (!editingId) return
     const payload = {
       ...values,
       planned_start: values.planned_start ? dayjs(values.planned_start).format('YYYY-MM-DD') : undefined,
       planned_end: values.planned_end ? dayjs(values.planned_end).format('YYYY-MM-DD') : undefined,
     }
     try {
-      await updateServiceOrder({ id: detailId, data: payload }).unwrap()
+      await updateServiceOrder({ id: editingId, data: payload }).unwrap()
       message.success('服务工单更新成功')
       setEditOpen(false)
       refetch()
@@ -108,7 +116,8 @@ const Services: React.FC = () => {
     { title: '工单编号', dataIndex: 'order_no', key: 'order_no', render: (no: string, r: ServiceOrder) => (
       <Button type="link" onClick={() => setDetailId(r.id)}>{no}</Button>
     )},
-    { title: '服务类型', dataIndex: 'service_type', key: 'service_type', render: (s: number) => serviceTypeMap.get(s) || s },
+    { title: '工单标题', dataIndex: 'title', key: 'title', ellipsis: true },
+    { title: '服务类型', dataIndex: 'service_type_name', key: 'service_type_name', render: (name: string) => name || '-' },
     { title: '客户', dataIndex: 'customer_name', key: 'customer_name' },
     { title: '负责人', dataIndex: 'assignee_name', key: 'assignee_name' },
     { title: '状态', dataIndex: 'status', key: 'status', render: (s: ServiceOrderStatus) => (
@@ -120,11 +129,13 @@ const Services: React.FC = () => {
       <Space>
         {(r.status === 'pending' || r.status === 'in_progress') && (
           <Button size="small" type="link" onClick={() => {
+            setEditingId(r.id)
             editForm.setFieldsValue({
               order_no: r.order_no,
               contract_id: r.contract_id,
               service_type: r.service_type,
               title: r.title,
+              assignee_id: r.assignee_id,
               planned_start: r.planned_start ? dayjs(r.planned_start) : undefined,
               planned_end: r.planned_end ? dayjs(r.planned_end) : undefined,
               remark: r.remark,
@@ -170,13 +181,16 @@ const Services: React.FC = () => {
             <Select options={serviceTypeOptions} />
           </Form.Item>
           <Form.Item name="title" label="工单标题" rules={[{ required: true }]}><Input /></Form.Item>
+          <Form.Item name="assignee_id" label="负责人">
+            <Select showSearch optionFilterProp="label" allowClear options={userOptions} placeholder="请选择负责人" />
+          </Form.Item>
           <Form.Item name="planned_start" label="计划开始日期"><DatePicker style={{ width: '100%' }} /></Form.Item>
           <Form.Item name="planned_end" label="计划结束日期"><DatePicker style={{ width: '100%' }} /></Form.Item>
           <Form.Item name="remark" label="备注"><Input.TextArea rows={3} /></Form.Item>
         </Form>
       </Drawer>
 
-      <Drawer title="编辑服务工单" open={editOpen} onClose={() => setEditOpen(false)} width={640} footer={
+      <Drawer title="编辑服务工单" open={editOpen} onClose={() => { setEditOpen(false); setEditingId(null) }} width={640} footer={
         <Space style={{ float: 'right' }}>
           <Button onClick={() => setEditOpen(false)}>取消</Button>
           <Button type="primary" onClick={() => editForm.submit()}>保存</Button>
@@ -194,6 +208,9 @@ const Services: React.FC = () => {
             <Select options={serviceTypeOptions} />
           </Form.Item>
           <Form.Item name="title" label="工单标题" rules={[{ required: true }]}><Input /></Form.Item>
+          <Form.Item name="assignee_id" label="负责人">
+            <Select showSearch optionFilterProp="label" allowClear options={userOptions} placeholder="请选择负责人" />
+          </Form.Item>
           <Form.Item name="planned_start" label="计划开始日期"><DatePicker style={{ width: '100%' }} /></Form.Item>
           <Form.Item name="planned_end" label="计划结束日期"><DatePicker style={{ width: '100%' }} /></Form.Item>
           <Form.Item name="remark" label="备注"><Input.TextArea rows={3} /></Form.Item>

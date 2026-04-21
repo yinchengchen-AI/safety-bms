@@ -59,14 +59,15 @@ npm run lint
 - **Models**: `app/models/` uses SQLAlchemy 2.0 ORM. All models inherit from `Base` and commonly use `TimestampMixin` and `SoftDeleteMixin` (`app/db/base.py`).
 - **CRUD pattern**: `app/crud/base.py` defines a generic `CRUDBase`. Domain CRUDs extend it (e.g., `app/crud/contract.py`).
 - **API endpoints**: `app/api/v1/endpoints/` contains route modules for auth, users, customers, contracts, services, invoices, payments, and dashboard.
-- **Services**: `app/services/` holds business logic such as `auth_service.py`, `invoice_service.py`, `payment_service.py`, and `minio_service.py`.
+- **Services**: `app/services/` holds business logic such as `auth_service.py`, `invoice_service.py`, `payment_service.py`, `contract_amount_service.py` (unified amount calculations), and `minio_service.py`.
 - **Auth & RBAC**:
   - Tokens are JWTs delivered via `httpOnly` cookies (`access_token`) with a fallback to the `Authorization` header.
   - `app/dependencies.py` provides `get_current_user` and `require_roles('admin', ...)` for endpoint guards.
   - Token blacklist is stored in Redis (SHA-256 hashed keys).
 - **Critical business logic**:
   - Contract state machine: allowed transitions are enforced in `contracts.py`.
-  - Invoice/payment amount limits: enforced with `with_for_update()` row locking in `invoice_service.py` and `payment_service.py` to prevent race conditions.
+  - Invoice/payment amount limits: enforced with `with_for_update()` row locking in `invoice_service.py`, `payment_service.py`, and `payments.py` (update endpoint) to prevent race conditions.
+  - Unified analytics filters: `app/utils/analytics_helpers.py` defines `filter_signed_contracts()`, `filter_valid_invoices()`, and `filter_valid_payments()` to ensure consistent statistical口径 across dashboard and analytics modules.
   - Rate limiting on `/login` and `/refresh` is backed by Redis.
 - **File storage**: MinIO is used for contract attachments and service reports. Uploads are validated for extension (`pdf`, `doc`, `docx`, `jpg`, `jpeg`, `png`) and max size (`10MB`).
 
@@ -85,7 +86,17 @@ npm run lint
 
 ## Important Patterns
 
-- **Soft deletes**: Most models use `is_deleted` / `deleted_at`. Queries should filter `is_deleted == False` unless intentionally fetching deleted records.
+- **Soft deletes**: `Contract`, `Invoice`, and `Payment` models all use `is_deleted` / `deleted_at` via `SoftDeleteMixin`. `CRUDBase.remove()` performs soft deletes automatically when the model has these fields. Queries should filter `is_deleted == False` unless intentionally fetching deleted records.
 - **Cookie auth in local dev**: If `DEBUG=true`, the backend sets `secure=False` and `samesite="lax"` so cookies work over HTTP. In production, `DEBUG` should be `false` for secure cookies.
 - **Database migrations**: Use Alembic from the `backend/` directory. After model changes, generate a migration and run `alembic upgrade head` before testing.
 - **API validation tests**: The script at `backend/scripts/api_validation_tests.py` exercises core security and business logic fixes (auth cookies, admin self-lockout, weak passwords, contract state machine, invoice/payment race conditions, MinIO validation).
+
+## Production Deployment Notes
+
+- **Backend server**: Production uses `gunicorn` with `uvicorn.workers.UvicornWorker` (see `backend/Dockerfile` and `backend/gunicorn.conf.py`). Do not run `uvicorn` directly in production.
+- **Swagger/Redoc**: Automatically hidden when `DEBUG=false` in `app/main.py`.
+- **CORS**: `ALLOWED_ORIGINS` defaults to an empty list in production. You must explicitly set it in `.env`.
+- **Database init**: `docker-compose.yml` includes a `backend-init` service that runs `alembic upgrade head` and `init_db.py` before the backend starts. No manual migration step is needed on deploy.
+- **Scheduler lock**: `app/core/scheduler.py` uses a Redis distributed lock (`safety_bms:scheduler_lock`) to prevent duplicate scheduled jobs when scaling backend horizontally.
+- **Logging**: `app/core/logging_config.py` outputs JSON-structured logs when `DEBUG=false`. Plain text logs are used in debug mode.
+- **Frontend runtime config**: `frontend/public/env.js` allows runtime override of `API_BASE_URL` via the `API_BASE_URL` environment variable (replaced by `docker-entrypoint.sh`).

@@ -13,6 +13,7 @@ from app.crud.invoice import crud_invoice
 from app.models.contract import Contract
 from app.models.invoice import Invoice
 from app.schemas.invoice import InvoiceAuditRequest, InvoiceCreate
+from app.services.contract_amount_service import get_available_invoice_amount
 
 
 def _decimal_attr(obj: object, field: str) -> Decimal:
@@ -48,8 +49,7 @@ class InvoiceService:
 
         # 3. 校验开票金额不超可开票余额
         contract_id = _int_attr(contract, "id")
-        already_invoiced = crud_invoice.get_sum_by_contract(db, contract_id=contract_id)
-        available = _decimal_attr(contract, "total_amount") - already_invoiced
+        available = get_available_invoice_amount(db, contract_id=contract_id)
         if obj_in.amount > available:
             raise InvoiceAmountExceededError(
                 available=available,
@@ -84,8 +84,7 @@ class InvoiceService:
             contract_id = _int_attr(contract, "id")
             db.query(Invoice).filter(Invoice.contract_id == contract_id).with_for_update().all()
 
-            already_invoiced = crud_invoice.get_sum_by_contract(db, contract_id=contract_id)
-            available = _decimal_attr(contract, "total_amount") - already_invoiced
+            available = get_available_invoice_amount(db, contract_id=contract_id)
             invoice_amount = _decimal_attr(invoice, "amount")
             if invoice_amount > available:
                 raise InvoiceAmountExceededError(available=available, requested=invoice_amount)

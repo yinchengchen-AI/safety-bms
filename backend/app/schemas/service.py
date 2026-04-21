@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from decimal import Decimal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
 from app.core.constants import ServiceOrderStatus
 
@@ -84,11 +84,16 @@ class ServiceOrderOut(ServiceOrderBase):
     assignee_name: str | None = None
     items: list[ServiceItemOut] = []
     reports: list[ServiceReportOut] = []
-    service_type_id: int
+    service_type_id: int = 0
     service_type_name: str | None = None
     service_type_code: str | None = None
 
     model_config = {"from_attributes": True}
+
+    @model_validator(mode="after")
+    def sync_service_type_id(self) -> "ServiceOrderOut":
+        self.service_type_id = self.service_type
+        return self
 
 
 class ServiceOrderListOut(BaseModel):
@@ -98,7 +103,7 @@ class ServiceOrderListOut(BaseModel):
     contract_id: int
     customer_name: str | None = None
     service_type: int
-    service_type_id: int
+    service_type_id: int = 0
     service_type_name: str | None = None
     service_type_code: str | None = None
     status: ServiceOrderStatus
@@ -109,3 +114,8 @@ class ServiceOrderListOut(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+    @model_validator(mode="after")
+    def sync_service_type_id(self) -> "ServiceOrderListOut":
+        self.service_type_id = self.service_type
+        return self

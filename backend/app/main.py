@@ -5,14 +5,17 @@ from fastapi.responses import JSONResponse
 from app.api.v1.router import api_router
 from app.config import settings
 from app.core.exceptions import BusinessError
+from app.core.logging_config import setup_logging
 from app.core.scheduler import shutdown_scheduler, start_scheduler
+
+setup_logging(debug=settings.DEBUG)
 
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
-    docs_url="/api/docs",
-    redoc_url="/api/redoc",
-    openapi_url="/api/openapi.json",
+    docs_url="/api/docs" if settings.DEBUG else None,
+    redoc_url="/api/redoc" if settings.DEBUG else None,
+    openapi_url="/api/openapi.json" if settings.DEBUG else None,
 )
 
 # CORS

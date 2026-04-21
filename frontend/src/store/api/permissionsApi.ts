@@ -21,7 +21,7 @@ export interface PermissionUpdate {
 
 export const permissionsApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
-    listPermissions: builder.query<{ items: Permission[]; total: number }, { page?: number; page_size?: number } | void>({
+    listPermissions: builder.query<{ items: Permission[]; total: number }, { page?: number; page_size?: number; keyword?: string } | void>({
       query: (params) => ({ url: '/permissions', params: params || {} }),
       providesTags: ['Permission'],
     }),

@@ -161,7 +161,7 @@ const Dashboard: React.FC = () => {
     data: serviceBarData,
     xField: '状态',
     yField: '数量',
-    color: '#1890ff',
+    colorField: '状态',
     xAxis: { title: { text: '状态' } },
     yAxis: { title: { text: '数量（个）' } },
     label: {
@@ -183,7 +183,7 @@ const Dashboard: React.FC = () => {
     data: contractAmountByServiceData,
     xField: '服务类型',
     yField: '金额',
-    color: '#722ed1',
+    colorField: '服务类型',
     xAxis: {
       title: { text: '服务类型' },
       labelAutoRotate: true,

@@ -21,7 +21,7 @@ def list_departments(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=200),
     keyword: str | None = None,
-    _: User = Depends(require_permissions(PermissionCode.DEPARTMENT_READ.value)),
+    _: User = Depends(require_permissions(PermissionCode.DEPARTMENT_READ)),
     db: Session = Depends(get_db),
 ):
     skip = (page - 1) * page_size
@@ -32,7 +32,7 @@ def list_departments(
 @router.get("/export")
 def export_departments(
     keyword: str | None = None,
-    _: User = Depends(require_permissions(PermissionCode.DEPARTMENT_READ.value)),
+    _: User = Depends(require_permissions(PermissionCode.DEPARTMENT_READ)),
     db: Session = Depends(get_db),
 ):
     query = db.query(Department)
@@ -60,7 +60,7 @@ def export_departments(
 @router.post("", response_model=DepartmentOut, status_code=201)
 def create_department(
     body: DepartmentCreate,
-    _: User = Depends(require_permissions(PermissionCode.DEPARTMENT_CREATE.value)),
+    _: User = Depends(require_permissions(PermissionCode.DEPARTMENT_CREATE)),
     db: Session = Depends(get_db),
 ):
     return crud_department.create(db, obj_in=body)
@@ -69,7 +69,7 @@ def create_department(
 @router.get("/{department_id}", response_model=DepartmentOut)
 def get_department(
     department_id: int,
-    _: User = Depends(require_permissions(PermissionCode.DEPARTMENT_READ.value)),
+    _: User = Depends(require_permissions(PermissionCode.DEPARTMENT_READ)),
     db: Session = Depends(get_db),
 ):
     dept = crud_department.get(db, id=department_id)
@@ -82,7 +82,7 @@ def get_department(
 def update_department(
     department_id: int,
     body: DepartmentUpdate,
-    _: User = Depends(require_permissions(PermissionCode.DEPARTMENT_UPDATE.value)),
+    _: User = Depends(require_permissions(PermissionCode.DEPARTMENT_UPDATE)),
     db: Session = Depends(get_db),
 ):
     dept = crud_department.get(db, id=department_id)
@@ -94,7 +94,7 @@ def update_department(
 @router.delete("/{department_id}", response_model=ResponseMsg)
 def delete_department(
     department_id: int,
-    _: User = Depends(require_permissions(PermissionCode.DEPARTMENT_DELETE.value)),
+    _: User = Depends(require_permissions(PermissionCode.DEPARTMENT_DELETE)),
     db: Session = Depends(get_db),
 ):
     dept = crud_department.get(db, id=department_id)

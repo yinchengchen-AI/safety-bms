@@ -2,20 +2,30 @@ from fastapi import APIRouter, Depends, File, Query, UploadFile
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.constants import PermissionCode
-from app.core.exceptions import BusinessError, NotFoundError, PermissionDeniedError
+from app.core.exceptions import (
+    BusinessError,
+    NotFoundError,
+    PaymentAmountExceededError,
+    PermissionDeniedError,
+)
 from app.crud.payment import crud_payment
 from app.db.session import get_db
 from app.dependencies import require_permissions
 from app.models.contract import Contract
+from app.models.invoice import Invoice
 from app.models.payment import Payment
 from app.models.user import User
-from app.schemas.common import FileUploadResponse, PageResponse
+from app.schemas.common import FileUploadResponse, PageResponse, ResponseMsg
 from app.schemas.payment import (
     ContractReceivable,
     PaymentCreate,
     PaymentListOut,
     PaymentOut,
     PaymentUpdate,
+)
+from app.services.contract_amount_service import (
+    get_available_payment_amount,
+    get_available_payment_for_invoice,
 )
 from app.services.minio_service import minio_service
 from app.services.notification_service import notification_service
@@ -43,6 +53,7 @@ def list_payments(
         db.query(Payment)
         .join(Contract, Payment.contract_id == Contract.id)
         .filter(Contract.is_deleted == False)
+        .filter(Payment.is_deleted == False)
     )
     if contract_id:
         query = query.filter(Payment.contract_id == contract_id)
@@ -82,6 +93,7 @@ def export_payments(
         db.query(Payment)
         .join(Contract, Payment.contract_id == Contract.id)
         .filter(Contract.is_deleted == False)
+        .filter(Payment.is_deleted == False)
     )
     if contract_id:
         query = query.filter(Payment.contract_id == contract_id)
@@ -197,7 +209,72 @@ def update_payment(
         raise NotFoundError("收款记录")
     if not check_data_scope(payment, current_user):
         raise PermissionDeniedError()
+
+    # 若修改了金额，校验不超合同可收余额
+    new_amount = getattr(body, "amount", None)
+    new_contract_id = getattr(body, "contract_id", None)
+    new_invoice_id = getattr(body, "invoice_id", None)
+    if new_amount is not None or new_contract_id is not None or new_invoice_id is not None:
+        contract_id_for_check = (
+            new_contract_id if new_contract_id is not None else payment.contract_id
+        )
+        amount_for_check = new_amount if new_amount is not None else payment.amount
+
+        contract = (
+            db.query(Contract)
+            .filter(Contract.id == contract_id_for_check, Contract.is_deleted == False)
+            .with_for_update()
+            .first()
+        )
+        if not contract:
+            raise NotFoundError("合同")
+
+        # 对已有收款加锁防止并发
+        db.query(Payment).filter(
+            Payment.contract_id == contract_id_for_check
+        ).with_for_update().all()
+
+        available = get_available_payment_amount(db, contract_id_for_check)
+        # 同合同且原记录已计入已收，需将原金额加回可用额度
+        if new_contract_id is None or new_contract_id == payment.contract_id:
+            available += Decimal(str(payment.amount or 0))
+        if Decimal(str(amount_for_check or 0)) > available:
+            raise PaymentAmountExceededError(
+                available=available, requested=Decimal(str(amount_for_check or 0))
+            )
+
+        # 若关联了发票，校验不超发票可收余额
+        invoice_id_for_check = new_invoice_id if new_invoice_id is not None else payment.invoice_id
+        if invoice_id_for_check:
+            invoice = db.query(Invoice).filter(Invoice.id == invoice_id_for_check).first()
+            if not invoice:
+                raise NotFoundError("发票")
+            if invoice.contract_id != contract_id_for_check:
+                raise BusinessError("关联发票不属于该合同")
+            available_for_invoice = get_available_payment_for_invoice(db, invoice_id_for_check)
+            if payment.invoice_id == invoice_id_for_check:
+                available_for_invoice += Decimal(str(payment.amount or 0))
+            if Decimal(str(amount_for_check or 0)) > available_for_invoice:
+                raise BusinessError(
+                    f"收款金额({float(amount_for_check):.2f})超过关联发票可收余额({float(available_for_invoice):.2f})"
+                )
+
     return crud_payment.update(db, db_obj=payment, obj_in=body)
+
+
+@router.delete("/{payment_id}", response_model=ResponseMsg)
+def delete_payment(
+    payment_id: int,
+    current_user: User = Depends(require_permissions(PermissionCode.PAYMENT_DELETE)),
+    db: Session = Depends(get_db),
+):
+    payment = crud_payment.get(db, id=payment_id)
+    if not payment:
+        raise NotFoundError("收款记录")
+    if not check_data_scope(payment, current_user):
+        raise PermissionDeniedError()
+    crud_payment.remove(db, id=payment_id)
+    return {"message": "删除成功"}
 
 
 @router.post("/{payment_id}/upload", response_model=FileUploadResponse)

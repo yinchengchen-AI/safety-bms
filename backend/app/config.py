@@ -6,7 +6,7 @@ class Settings(BaseSettings):
     APP_NAME: str = "安全生产业务管理系统"
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = False
-    ALLOWED_ORIGINS: list[str] = ["http://localhost:5173", "http://localhost:80"]
+    ALLOWED_ORIGINS: list[str] = []
 
     # Database
     DB_HOST: str = "localhost"

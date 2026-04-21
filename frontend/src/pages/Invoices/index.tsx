@@ -25,6 +25,7 @@ const Invoices: React.FC = () => {
   const [editOpen, setEditOpen] = useState(false)
   const [auditOpen, setAuditOpen] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
+  const [editingRecord, setEditingRecord] = useState<Invoice | null>(null)
   const [auditingId, setAuditingId] = useState<number | null>(null)
   const [auditAction, setAuditAction] = useState<'approve' | 'reject' | null>(null)
   const [customerId, setCustomerId] = useState<number | undefined>()
@@ -84,6 +85,7 @@ const Invoices: React.FC = () => {
 
   const handleEdit = async (record: Invoice) => {
     setEditingId(record.id)
+    setEditingRecord(record)
     setCustomerId(record.contract_id ? (contractsData?.items.find(c => c.id === record.contract_id)?.customer_id) : undefined)
     setContractId(record.contract_id)
     editForm.setFieldsValue({
@@ -100,6 +102,16 @@ const Invoices: React.FC = () => {
 
   const handleUpdate = async (values: any) => {
     if (!editingId) return
+    if (selectedContract) {
+      let available = selectedContract.total_amount - (selectedContract.invoiced_amount || 0)
+      if (editingRecord && editingRecord.contract_id === contractId && ['issued', 'sent'].includes(editingRecord.status)) {
+        available += editingRecord.amount
+      }
+      if (values.amount > available) {
+        message.error('开票金额不能超过合同可开票余额')
+        return
+      }
+    }
     const payload = {
       ...values,
       contract_id: contractId,
@@ -110,6 +122,7 @@ const Invoices: React.FC = () => {
       setEditOpen(false)
       editForm.resetFields()
       setEditingId(null)
+      setEditingRecord(null)
       setCustomerId(undefined)
       setContractId(undefined)
     } catch (err: any) {
@@ -267,22 +280,22 @@ const Invoices: React.FC = () => {
         </Form>
       </Drawer>
 
-      <Drawer title="编辑发票" open={editOpen} onClose={() => { setEditOpen(false); setEditingId(null); setCustomerId(undefined); setContractId(undefined) }} width={640} footer={
+      <Drawer title="编辑发票" open={editOpen} onClose={() => { setEditOpen(false); setEditingId(null); setEditingRecord(null); setCustomerId(undefined); setContractId(undefined) }} width={640} footer={
         <Space style={{ float: 'right' }}>
-          <Button onClick={() => { setEditOpen(false); setEditingId(null); setCustomerId(undefined); setContractId(undefined) }}>取消</Button>
+          <Button onClick={() => { setEditOpen(false); setEditingId(null); setEditingRecord(null); setCustomerId(undefined); setContractId(undefined) }}>取消</Button>
           <Button type="primary" loading={updating} onClick={() => editForm.submit()}>保存</Button>
         </Space>
       }>
         <Form form={editForm} layout="vertical" onFinish={handleUpdate}>
           <Form.Item name="customer_id" label="关联公司" rules={[{ required: true }]}>
-            <Select showSearch optionFilterProp="label" placeholder="请先选择公司" onChange={(v) => { setCustomerId(v); setContractId(undefined); editForm.setFieldValue('contract_id', undefined) }}
+            <Select showSearch optionFilterProp="label" placeholder="请先选择公司" disabled
               options={customersData?.items.map(c => ({ value: c.id, label: c.name })) || []} />
           </Form.Item>
           <Form.Item name="contract_id" label="关联合同" rules={[{ required: true }]}>
-            <Select showSearch optionFilterProp="label" placeholder={customerId ? '请选择合同' : '请先选择公司'} disabled={!customerId} onChange={(v) => setContractId(v)}
+            <Select showSearch optionFilterProp="label" placeholder={customerId ? '请选择合同' : '请先选择公司'} disabled
               options={filteredContracts.map(c => ({ value: c.id, label: `${c.contract_no} - ${c.title}` }))} />
           </Form.Item>
-          <Form.Item name="invoice_no" label="发票编号" rules={[{ required: true }]}><Input /></Form.Item>
+          <Form.Item name="invoice_no" label="发票编号" rules={[{ required: true }]}><Input disabled /></Form.Item>
           <Form.Item name="invoice_type" label="发票类型" rules={[{ required: true }]}>
             <Select options={Object.entries(InvoiceTypeLabels).map(([v, l]) => ({ value: v, label: l }))} />
           </Form.Item>

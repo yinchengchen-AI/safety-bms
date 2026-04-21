@@ -3,10 +3,10 @@ from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import relationship
 
 from app.core.constants import InvoiceStatus, InvoiceType
-from app.db.base import Base, TimestampMixin
+from app.db.base import Base, SoftDeleteMixin, TimestampMixin
 
 
-class Invoice(Base, TimestampMixin):
+class Invoice(Base, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "invoices"
 
     id = Column(Integer, primary_key=True, index=True)

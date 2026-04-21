@@ -264,7 +264,7 @@ export interface ServiceOrder {
 }
 
 export interface ServiceOrderCreate {
-  order_no: string
+  order_no?: string
   contract_id: number
   title: string
   service_type: number

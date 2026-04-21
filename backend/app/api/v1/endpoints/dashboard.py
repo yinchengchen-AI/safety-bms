@@ -5,8 +5,6 @@ from sqlalchemy import extract, func
 from sqlalchemy.orm import Session
 
 from app.core.constants import (
-    ContractStatus,
-    InvoiceStatus,
     PermissionCode,
 )
 from app.crud.payment import crud_payment
@@ -18,6 +16,11 @@ from app.models.invoice import Invoice
 from app.models.payment import Payment
 from app.models.service import ServiceOrder
 from app.models.user import User
+from app.utils.analytics_helpers import (
+    filter_signed_contracts,
+    filter_valid_invoices,
+    filter_valid_payments,
+)
 from app.utils.data_scope import apply_data_scope
 from app.utils.enum_format import enum_value
 
@@ -30,7 +33,7 @@ def _invoice_metric_date_expr():
 
 @router.get("/stats")
 def get_stats(
-    current_user: User = Depends(require_permissions(PermissionCode.DASHBOARD_READ.value)),
+    current_user: User = Depends(require_permissions(PermissionCode.DASHBOARD_READ)),
     db: Session = Depends(get_db),
 ):
     today = date.today()
@@ -56,10 +59,10 @@ def get_stats(
 
     # 本月开票金额
     invoice_query = db.query(func.coalesce(func.sum(Invoice.amount), 0)).filter(
-        Invoice.status.in_([InvoiceStatus.ISSUED, InvoiceStatus.SENT]),
         func.extract("year", invoice_metric_date) == current_year,
         func.extract("month", invoice_metric_date) == current_month,
     )
+    invoice_query = filter_valid_invoices(invoice_query)
     invoice_query = apply_data_scope(invoice_query, Invoice, current_user)
     monthly_invoice_amount = invoice_query.scalar()
 
@@ -68,17 +71,18 @@ def get_stats(
         func.extract("year", Payment.payment_date) == current_year,
         func.extract("month", Payment.payment_date) == current_month,
     )
+    payment_query = filter_valid_payments(payment_query)
     payment_query = apply_data_scope(payment_query, Payment, current_user)
     monthly_payment_amount = payment_query.scalar()
 
     # 总应收余额
-    total_contract_query = db.query(func.coalesce(func.sum(Contract.total_amount), 0)).filter(
-        Contract.is_deleted == False, Contract.status == ContractStatus.ACTIVE
-    )
+    total_contract_query = db.query(func.coalesce(func.sum(Contract.total_amount), 0))
+    total_contract_query = filter_signed_contracts(total_contract_query)
     total_contract_query = apply_data_scope(total_contract_query, Contract, current_user)
     total_contract_amount = total_contract_query.scalar()
 
     total_received_query = db.query(func.coalesce(func.sum(Payment.amount), 0))
+    total_received_query = filter_valid_payments(total_received_query)
     total_received_query = apply_data_scope(total_received_query, Payment, current_user)
     total_received = total_received_query.scalar()
 
@@ -88,13 +92,11 @@ def get_stats(
             extract("month", invoice_metric_date).label("month"),
             func.sum(Invoice.amount).label("total"),
         )
-        .filter(
-            Invoice.status.in_([InvoiceStatus.ISSUED, InvoiceStatus.SENT]),
-            extract("year", invoice_metric_date) == current_year,
-        )
+        .filter(extract("year", invoice_metric_date) == current_year)
         .group_by(extract("month", invoice_metric_date))
         .order_by(extract("month", invoice_metric_date))
     )
+    monthly_invoice_query = filter_valid_invoices(monthly_invoice_query)
     monthly_invoice_query = apply_data_scope(monthly_invoice_query, Invoice, current_user)
     monthly_invoice_results = monthly_invoice_query.all()
     monthly_invoices = [
@@ -111,6 +113,7 @@ def get_stats(
         .group_by(extract("month", Payment.payment_date))
         .order_by(extract("month", Payment.payment_date))
     )
+    monthly_payment_query = filter_valid_payments(monthly_payment_query)
     monthly_payment_query = apply_data_scope(monthly_payment_query, Payment, current_user)
     monthly_payment_results = monthly_payment_query.all()
     monthly_payments = [
@@ -118,11 +121,8 @@ def get_stats(
     ]
 
     # 逾期合同数及列表
-    overdue_query = db.query(Contract).filter(
-        Contract.is_deleted == False,
-        Contract.status == ContractStatus.ACTIVE,
-        Contract.end_date < today,
-    )
+    overdue_query = db.query(Contract).filter(Contract.end_date < today)
+    overdue_query = filter_signed_contracts(overdue_query)
     overdue_query = apply_data_scope(overdue_query, Contract, current_user)
     overdue_contracts_db = overdue_query.all()
 

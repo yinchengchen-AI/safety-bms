@@ -1,4 +1,5 @@
 import logging
+import socket
 from datetime import UTC, datetime, timedelta
 
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -8,10 +9,15 @@ from app.db.session import SessionLocal
 from app.models.contract import Contract, ContractStatus
 from app.models.notification import Notification
 from app.models.service import ServiceOrder, ServiceOrderStatus
+from app.utils.redis_client import get_redis_client
 
 logger = logging.getLogger(__name__)
 
 _scheduler: BackgroundScheduler | None = None
+
+# Redis 分布式锁配置
+_SCHEDULER_LOCK_KEY = "safety_bms:scheduler_lock"
+_SCHEDULER_LOCK_TTL = 60  # 锁过期时间（秒），应大于调度器心跳间隔
 
 
 def get_scheduler() -> BackgroundScheduler:
@@ -19,6 +25,37 @@ def get_scheduler() -> BackgroundScheduler:
     if _scheduler is None:
         _scheduler = BackgroundScheduler(timezone="Asia/Shanghai")
     return _scheduler
+
+
+def _acquire_scheduler_lock() -> bool:
+    """通过 Redis 获取调度器启动锁，防止多实例重复启动调度任务。"""
+    try:
+        redis_client = get_redis_client()
+        host_id = socket.gethostname()
+        # NX: 仅在 key 不存在时设置；EX: 设置过期时间
+        acquired = redis_client.set(
+            _SCHEDULER_LOCK_KEY,
+            host_id,
+            nx=True,
+            ex=_SCHEDULER_LOCK_TTL,
+        )
+        return bool(acquired)
+    except Exception:
+        logger.exception("获取调度器 Redis 锁失败，当前实例将不启动调度器")
+        return False
+
+
+def _renew_scheduler_lock() -> None:
+    """续期调度器锁，应在主调度任务中定期调用。"""
+    try:
+        redis_client = get_redis_client()
+        host_id = socket.gethostname()
+        # 只有当当前主机持有锁时才续期
+        current = redis_client.get(_SCHEDULER_LOCK_KEY)
+        if current and current.decode() == host_id:
+            redis_client.expire(_SCHEDULER_LOCK_KEY, _SCHEDULER_LOCK_TTL)
+    except Exception:
+        logger.exception("续期调度器 Redis 锁失败")
 
 
 def _check_contract_expiry() -> None:
@@ -146,32 +183,56 @@ def _check_service_order_deadline() -> None:
         db.close()
 
 
+def _wrap_with_lock_renewal(fn):
+    """包装任务函数，执行前续期分布式锁。"""
+
+    def wrapper():
+        _renew_scheduler_lock()
+        fn()
+
+    return wrapper
+
+
 def start_scheduler() -> None:
     scheduler = get_scheduler()
-    if not scheduler.running:
-        # 每天上午9点检查合同到期
-        scheduler.add_job(
-            _check_contract_expiry,
-            trigger=CronTrigger(hour=9, minute=0),
-            id="check_contract_expiry",
-            replace_existing=True,
-        )
-        # 每天凌晨1点自动状态迁移 signed → executing
-        scheduler.add_job(
-            _auto_transition_contracts,
-            trigger=CronTrigger(hour=1, minute=0),
-            id="auto_transition_contracts",
-            replace_existing=True,
-        )
-        # 每天上午8点检查服务工单到期
-        scheduler.add_job(
-            _check_service_order_deadline,
-            trigger=CronTrigger(hour=8, minute=0),
-            id="check_service_order_deadline",
-            replace_existing=True,
-        )
-        scheduler.start()
-        logger.info("定时任务调度器已启动")
+    if scheduler.running:
+        return
+
+    if not _acquire_scheduler_lock():
+        logger.info("未获取到调度器分布式锁，当前实例不启动定时任务（其他实例已持有锁）")
+        return
+
+    # 每天上午9点检查合同到期
+    scheduler.add_job(
+        _wrap_with_lock_renewal(_check_contract_expiry),
+        trigger=CronTrigger(hour=9, minute=0),
+        id="check_contract_expiry",
+        replace_existing=True,
+    )
+    # 每天凌晨1点自动状态迁移 signed → executing
+    scheduler.add_job(
+        _wrap_with_lock_renewal(_auto_transition_contracts),
+        trigger=CronTrigger(hour=1, minute=0),
+        id="auto_transition_contracts",
+        replace_existing=True,
+    )
+    # 每天上午8点检查服务工单到期
+    scheduler.add_job(
+        _wrap_with_lock_renewal(_check_service_order_deadline),
+        trigger=CronTrigger(hour=8, minute=0),
+        id="check_service_order_deadline",
+        replace_existing=True,
+    )
+    # 每 30 秒续期一次锁，确保持有锁的实例存活
+    scheduler.add_job(
+        _renew_scheduler_lock,
+        trigger="interval",
+        seconds=30,
+        id="scheduler_lock_renewal",
+        replace_existing=True,
+    )
+    scheduler.start()
+    logger.info("定时任务调度器已启动（已获取分布式锁）")
 
 
 def shutdown_scheduler() -> None:
@@ -179,3 +240,12 @@ def shutdown_scheduler() -> None:
     if scheduler.running:
         scheduler.shutdown()
         logger.info("定时任务调度器已停止")
+    try:
+        redis_client = get_redis_client()
+        host_id = socket.gethostname()
+        current = redis_client.get(_SCHEDULER_LOCK_KEY)
+        if current and current.decode() == host_id:
+            redis_client.delete(_SCHEDULER_LOCK_KEY)
+            logger.info("调度器分布式锁已释放")
+    except Exception:
+        logger.exception("释放调度器分布式锁失败")

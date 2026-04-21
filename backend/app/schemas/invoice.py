@@ -22,6 +22,9 @@ class InvoiceCreate(InvoiceBase):
 
 
 class InvoiceUpdate(BaseModel):
+    contract_id: int | None = None
+    amount: Decimal | None = None
+    tax_rate: Decimal | None = None
     status: InvoiceStatus | None = None
     invoice_date: date | None = None
     actual_invoice_no: str | None = None

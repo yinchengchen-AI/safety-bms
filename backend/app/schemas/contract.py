@@ -196,5 +196,7 @@ class ContractListOut(BaseModel):
     draft_doc_url: str | None = None
     final_pdf_url: str | None = None
     created_at: datetime
+    invoiced_amount: Decimal | None = None
+    received_amount: Decimal | None = None
 
     model_config = {"from_attributes": True}

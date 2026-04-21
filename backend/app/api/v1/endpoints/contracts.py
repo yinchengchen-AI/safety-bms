@@ -1,6 +1,7 @@
 import contextlib
 import logging
 from datetime import UTC, datetime
+from decimal import Decimal
 
 from fastapi import APIRouter, Depends, File, Query, UploadFile
 from sqlalchemy.orm import Session, joinedload
@@ -8,6 +9,8 @@ from sqlalchemy.orm import Session, joinedload
 from app.core.constants import ContractStatus, PermissionCode
 from app.core.exceptions import BusinessError, DuplicateError, NotFoundError, PermissionDeniedError
 from app.crud.contract import crud_contract
+from app.crud.invoice import crud_invoice
+from app.crud.payment import crud_payment
 from app.db.session import get_db
 from app.dependencies import require_permissions
 from app.models.contract import (
@@ -107,11 +110,22 @@ def list_contracts(
     query = apply_data_scope(query, Contract, current_user)
     total = query.count()
     items = query.order_by(Contract.created_at.desc()).offset(skip).limit(page_size).all()
-    # 附加 customer_name
+    # 批量查询已开票和已收款金额
+    contract_ids = [c.id for c in items]
+    invoiced_sums = (
+        crud_invoice.get_sums_by_contract_ids(db, contract_ids=contract_ids) if contract_ids else {}
+    )
+    received_sums = (
+        crud_payment.get_sums_by_contract_ids(db, contract_ids=contract_ids) if contract_ids else {}
+    )
+
+    # 附加 customer_name 和统计金额
     result = []
     for c in items:
         item = ContractListOut.model_validate(c)
         _enrich_contract_list_out(c, item)
+        item.invoiced_amount = invoiced_sums.get(c.id, Decimal("0"))
+        item.received_amount = received_sums.get(c.id, Decimal("0"))
         result.append(item)
     return make_page_response(total, result, page, page_size)
 
@@ -321,10 +335,8 @@ def update_contract_status(
             )
             .first()
         )
-        has_invoices = db.query(Invoice).filter(Invoice.contract_id == contract_id).first()
-        has_payments = db.query(Payment).filter(Payment.contract_id == contract_id).first()
-        if pending_orders or has_invoices or has_payments:
-            raise BusinessError("合同存在未完成的工单、发票或收款记录，请先处理完毕后再终止")
+        if pending_orders:
+            raise BusinessError("合同存在未完成的工单，请先处理完毕后再终止")
     updated = crud_contract.update_status(
         db,
         db_obj=contract,

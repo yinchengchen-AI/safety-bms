@@ -54,7 +54,7 @@ export const usersApi = baseApi.injectEndpoints({
       query: (id) => ({ url: `/users/${id}`, method: 'DELETE' }),
       invalidatesTags: ['User'],
     }),
-    listRoles: builder.query<Role[], void>({
+    getAllRoles: builder.query<Role[], void>({
       query: () => '/users/roles',
       providesTags: ['Role'],
     }),
@@ -72,5 +72,5 @@ export const {
   useCreateUserMutation,
   useUpdateUserMutation,
   useDeleteUserMutation,
-  useListRolesQuery,
+  useGetAllRolesQuery,
 } = usersApi

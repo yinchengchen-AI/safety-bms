@@ -3,10 +3,10 @@ from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import relationship
 
 from app.core.constants import PaymentMethod
-from app.db.base import Base, TimestampMixin
+from app.db.base import Base, SoftDeleteMixin, TimestampMixin
 
 
-class Payment(Base, TimestampMixin):
+class Payment(Base, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "payments"
 
     id = Column(Integer, primary_key=True, index=True)
