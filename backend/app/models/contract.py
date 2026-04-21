@@ -102,7 +102,7 @@ class ContractTemplate(Base, TimestampMixin):
         nullable=False,
         comment="适用服务类型",
     )
-    file_url = Column(String(500), nullable=False, comment="模板文件 MinIO 路径")
+    file_url = Column(String(500), nullable=True, comment="模板文件 MinIO 路径")
     is_default = Column(Boolean, default=False, comment="是否默认模板")
     created_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
