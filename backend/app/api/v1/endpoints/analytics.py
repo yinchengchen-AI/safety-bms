@@ -28,6 +28,7 @@ from app.schemas.analytics import (
     CustomerGrowthItemOut,
     CustomerIndustryDistributionItemOut,
     CustomerInsightsOut,
+    CustomerRegionDistributionItemOut,
     CustomerStatusDistributionItemOut,
     PerformanceRankingItemOut,
     PerformanceRankingOut,
@@ -399,6 +400,37 @@ def _build_drilldown_rows(
                 date_label=item.created_at.date().isoformat() if item.created_at else None,
                 status=enum_value(item.status),
                 extra=item.industry,
+            )
+            for item in items
+        ]
+
+    if source == "customer-region" and group_value:
+        query = db.query(Customer).filter(Customer.is_deleted == False)
+        if date_from:
+            query = query.filter(func.date(Customer.created_at) >= date_from)
+        if date_to:
+            query = query.filter(func.date(Customer.created_at) <= date_to)
+        query = apply_data_scope(query, Customer, current_user)
+        if group_value == "未填写":
+            query = query.filter(Customer.city.is_(None))
+        else:
+            query = query.filter(
+                func.coalesce(Customer.city, "") + func.coalesce(Customer.district, "")
+                == group_value
+            )
+        items = query.order_by(Customer.created_at.desc()).all()
+        return [
+            AnalyticsDrilldownItemOut(
+                id=item.id,
+                category="customer",
+                primary_label=item.name,
+                secondary_label=item.contact_name,
+                amount=None,
+                date_label=item.created_at.date().isoformat() if item.created_at else None,
+                status=enum_value(item.status),
+                extra="".join(
+                    [p for p in [item.province, item.city, item.district, item.street] if p]
+                ),
             )
             for item in items
         ]
@@ -836,6 +868,27 @@ def get_customer_insights(
     status_query = apply_data_scope(status_query, Customer, current_user)
     status_results = status_query.group_by(Customer.status).all()
 
+    region_expr = func.coalesce(
+        func.nullif(
+            func.trim(
+                func.coalesce(Customer.city, "")
+                + func.case((Customer.district.isnot(None), Customer.district), else_="")
+            ),
+            "",
+        ),
+        func.coalesce(Customer.city, "未填写"),
+    )
+    region_query = db.query(
+        region_expr.label("region"),
+        func.count(Customer.id).label("count"),
+    ).filter(Customer.is_deleted == False)
+    if date_from:
+        region_query = region_query.filter(func.date(Customer.created_at) >= date_from)
+    if date_to:
+        region_query = region_query.filter(func.date(Customer.created_at) <= date_to)
+    region_query = apply_data_scope(region_query, Customer, current_user)
+    region_results = region_query.group_by(region_expr).all()
+
     return CustomerInsightsOut(
         growth_trend=[
             CustomerGrowthItemOut(
@@ -850,6 +903,10 @@ def get_customer_insights(
         status_distribution=[
             CustomerStatusDistributionItemOut(status=enum_value(item.status), count=int(item.count))
             for item in status_results
+        ],
+        region_distribution=[
+            CustomerRegionDistributionItemOut(region=str(item.region), count=int(item.count))
+            for item in region_results
         ],
     )
 

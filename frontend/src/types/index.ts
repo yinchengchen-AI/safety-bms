@@ -459,10 +459,16 @@ export interface CustomerStatusDistributionItem {
   count: number
 }
 
+export interface CustomerRegionDistributionItem {
+  region: string
+  count: number
+}
+
 export interface CustomerInsightsResponse {
   growth_trend: CustomerGrowthItem[]
   industry_distribution: CustomerIndustryDistributionItem[]
   status_distribution: CustomerStatusDistributionItem[]
+  region_distribution: CustomerRegionDistributionItem[]
 }
 
 export interface ServiceEfficiencyTrendItem {

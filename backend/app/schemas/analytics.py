@@ -71,10 +71,16 @@ class CustomerStatusDistributionItemOut(BaseModel):
     count: int
 
 
+class CustomerRegionDistributionItemOut(BaseModel):
+    region: str
+    count: int
+
+
 class CustomerInsightsOut(BaseModel):
     growth_trend: list[CustomerGrowthItemOut]
     industry_distribution: list[CustomerIndustryDistributionItemOut]
     status_distribution: list[CustomerStatusDistributionItemOut]
+    region_distribution: list[CustomerRegionDistributionItemOut]
 
 
 class ServiceEfficiencyTrendItemOut(BaseModel):

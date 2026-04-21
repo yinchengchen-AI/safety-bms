@@ -91,6 +91,12 @@ const Analytics: React.FC = () => {
     value: item.count,
   })) || []
 
+  const customerRegionData = customerQuery.data?.region_distribution.map((item) => ({
+    type: item.region,
+    value: item.count,
+    rawRegion: item.region,
+  })) || []
+
   const serviceTrendData = (serviceQuery.data?.trend || []).flatMap((item) => ([
     { period: item.period, value: item.new_orders, type: '新增工单' },
     { period: item.period, value: item.completed_orders, type: '完成工单' },
@@ -170,6 +176,10 @@ const Analytics: React.FC = () => {
   const openCustomerStatusDrilldown = async (datum: { type: string }) => {
     const rawStatus = Object.entries(CustomerStatusLabels).find(([, label]) => label === datum.type)?.[0] || datum.type
     await openDrilldown({ source: 'customer-status', group_value: rawStatus, ...params }, `客户状态明细 - ${datum.type}`)
+  }
+
+  const openCustomerRegionDrilldown = async (datum: { type: string; rawRegion?: string }) => {
+    await openDrilldown({ source: 'customer-region', group_value: datum.rawRegion || datum.type, ...params }, `客户属地明细 - ${datum.type}`)
   }
 
   const openServiceTypeDrilldown = async (datum: { type: string; rawType?: string }) => {
@@ -346,10 +356,28 @@ const Analytics: React.FC = () => {
                   </Col>
                 </Row>
                 <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
-                  <Col span={16}>
+                  <Col span={8}>
+                    <Card title="客户属地分布">
+                      {customerRegionData.length === 0 ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无数据" /> : (
+                        <Pie
+                          data={customerRegionData}
+                          angleField="value"
+                          colorField="type"
+                          height={260}
+                          onReady={(plot) => {
+                            plot.on('element:click', (event: any) => {
+                              const datum = event?.data?.data
+                              if (datum) void openCustomerRegionDrilldown(datum)
+                            })
+                          }}
+                        />
+                      )}
+                    </Card>
+                  </Col>
+                  <Col span={8}>
                     <Card title="服务效率趋势">
                       {serviceTrendData.length === 0 ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无数据" /> : (
-                        <Line data={serviceTrendData} xField="period" yField="value" seriesField="type" colorField="type" height={280} />
+                        <Line data={serviceTrendData} xField="period" yField="value" seriesField="type" colorField="type" height={260} />
                       )}
                     </Card>
                   </Col>
@@ -360,7 +388,7 @@ const Analytics: React.FC = () => {
                           data={serviceTypeData}
                           xField="type"
                           yField="value"
-                          height={280}
+                          height={260}
                           onReady={(plot) => {
                             plot.on('element:click', (event: any) => {
                               const datum = event?.data?.data
