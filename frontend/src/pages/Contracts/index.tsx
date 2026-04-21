@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react'
-import { Table, Button, Input, Select, Tag, Space, Popconfirm, message, Drawer, Form, InputNumber, DatePicker, Descriptions, Divider, Modal, Upload } from 'antd'
+import { Table, Button, Input, Select, Tag, Space, Popconfirm, message, Drawer, Form, InputNumber, DatePicker, Descriptions, Divider, Modal, Upload, Radio } from 'antd'
 import { PermissionButton } from '@/components/auth/PermissionButton'
-import { PlusOutlined, FileTextOutlined, UploadOutlined, DeleteOutlined, StopOutlined } from '@ant-design/icons'
+import { PlusOutlined, FileTextOutlined, UploadOutlined, DeleteOutlined, StopOutlined, EditOutlined } from '@ant-design/icons'
+import SignaturePad from '@/components/SignaturePad'
 import {
   useListContractsQuery, useCreateContractMutation, useUpdateContractMutation, useDeleteContractMutation,
   useUpdateContractStatusMutation, useGetContractQuery,
@@ -9,6 +10,7 @@ import {
   useUploadContractAttachmentFileMutation,
   useUploadContractAttachmentMutation,
   useDeleteContractAttachmentMutation,
+  useSignContractMutation,
 } from '@/store/api/contractsApi'
 import { useListContractTemplatesQuery } from '@/store/api/contractTemplatesApi'
 import { useListCustomersQuery } from '@/store/api/customersApi'
@@ -52,11 +54,16 @@ const Contracts: React.FC = () => {
   const [uploadOpen, setUploadOpen] = useState(false)
   const [uploadingContractId, setUploadingContractId] = useState<number | null>(null)
   const [uploadFile, setUploadFile] = useState<File | null>(null)
+  const [signModalOpen, setSignModalOpen] = useState(false)
+  const [signingContractId, setSigningContractId] = useState<number | null>(null)
+  const [signParty, setSignParty] = useState<'party_a' | 'party_b'>('party_a')
+  const [signName, setSignName] = useState('')
   const [form] = Form.useForm()
   const [editForm] = Form.useForm()
   const [generateDraft, { isLoading: generatingDraft }] = useGenerateContractDraftMutation()
   const [uploadContractAttachmentFile] = useUploadContractAttachmentFileMutation()
   const [uploadContractAttachment] = useUploadContractAttachmentMutation()
+  const [signContract, { isLoading: _signing }] = useSignContractMutation()
   const { data: serviceTypesData } = useListServiceTypesQuery({ page_size: 200 })
 
   const serviceTypeMap = React.useMemo(() => {
@@ -84,6 +91,36 @@ const Contracts: React.FC = () => {
     setUploadOpen(true)
   }
 
+  const handleOpenSign = (record: Contract) => {
+    setSigningContractId(record.id)
+    setSignParty('party_a')
+    setSignName('')
+    setSignModalOpen(true)
+  }
+
+  const handleSign = async (base64Image: string) => {
+    if (!signingContractId || !signName) {
+      message.warning('请输入签署人姓名')
+      return
+    }
+    try {
+      await signContract({
+        id: signingContractId,
+        data: {
+          party: signParty,
+          signed_by: signName,
+          signature_base64: base64Image,
+        }
+      }).unwrap()
+      message.success('签署成功')
+      setSignModalOpen(false)
+      setSigningContractId(null)
+      setSignName('')
+    } catch (err: any) {
+      message.error(err?.data?.detail || '签署失败')
+    }
+  }
+
   useEffect(() => {
     if (createOpen) {
       form.setFieldsValue({ contract_no: generateBizNo('HT') })
@@ -97,6 +134,15 @@ const Contracts: React.FC = () => {
   const [updateContract, { isLoading: updating }] = useUpdateContractMutation()
   const [deleteContract] = useDeleteContractMutation()
   const [updateStatus] = useUpdateContractStatusMutation()
+
+  const handleUpdateStatus = async (id: number, status: ContractStatus) => {
+    try {
+      await updateStatus({ id, status }).unwrap()
+      message.success('状态更新成功')
+    } catch (err: any) {
+      message.error(err?.data?.detail || '状态更新失败')
+    }
+  }
 
   const getTemplateOptions = (serviceType?: number) => {
     if (!templatesData?.items) return []
@@ -196,25 +242,28 @@ const Contracts: React.FC = () => {
           <PermissionButton permission="contract:update" size="small" icon={<FileTextOutlined />} onClick={() => handleGenerateDraft(r.id)} loading={generatingDraft}>生成草稿</PermissionButton>
         )}
         {r.status === 'draft' && (
+          <PermissionButton permission="contract:sign" size="small" icon={<EditOutlined />} onClick={() => handleOpenSign(r)}>电子签名</PermissionButton>
+        )}
+        {r.status === 'draft' && (
           <PermissionButton permission="contract:update" size="small" icon={<UploadOutlined />} onClick={() => handleOpenUpload(r)}>上传已签附件</PermissionButton>
         )}
         {r.status === 'draft' && (
-          <Popconfirm title="确认终止合同？" onConfirm={() => updateStatus({ id: r.id, status: 'terminated' })}>
+          <Popconfirm title="确认终止合同？" onConfirm={() => handleUpdateStatus(r.id, 'terminated')}>
             <PermissionButton permission="contract:update" size="small" danger icon={<StopOutlined />}>终止</PermissionButton>
           </Popconfirm>
         )}
         {r.status === 'signed' && (
           <>
-            <PermissionButton permission="contract:update" size="small" type="primary" onClick={() => updateStatus({ id: r.id, status: 'executing' })}>开始履行</PermissionButton>
-            <Popconfirm title="确认终止合同？" onConfirm={() => updateStatus({ id: r.id, status: 'terminated' })}>
+            <PermissionButton permission="contract:update" size="small" type="primary" onClick={() => handleUpdateStatus(r.id, 'executing')}>开始履行</PermissionButton>
+            <Popconfirm title="确认终止合同？" onConfirm={() => handleUpdateStatus(r.id, 'terminated')}>
               <PermissionButton permission="contract:update" size="small" danger icon={<StopOutlined />}>终止</PermissionButton>
             </Popconfirm>
           </>
         )}
         {r.status === 'executing' && (
           <>
-            <PermissionButton permission="contract:update" size="small" type="primary" onClick={() => updateStatus({ id: r.id, status: 'completed' })}>标记完成</PermissionButton>
-            <Popconfirm title="确认终止合同？" onConfirm={() => updateStatus({ id: r.id, status: 'terminated' })}>
+            <PermissionButton permission="contract:update" size="small" type="primary" onClick={() => handleUpdateStatus(r.id, 'completed')}>标记完成</PermissionButton>
+            <Popconfirm title="确认终止合同？" onConfirm={() => handleUpdateStatus(r.id, 'terminated')}>
               <PermissionButton permission="contract:update" size="small" danger icon={<StopOutlined />}>终止</PermissionButton>
             </Popconfirm>
           </>
@@ -360,6 +409,7 @@ const Contracts: React.FC = () => {
         onClose={() => setSelectedId(null)}
         onGenerateDraft={handleGenerateDraft}
         onOpenUpload={handleOpenUpload}
+        onOpenSign={handleOpenSign}
         generatingDraft={generatingDraft}
       />}
 
@@ -397,6 +447,41 @@ const Contracts: React.FC = () => {
           <Button icon={<UploadOutlined />}>选择文件</Button>
         </Upload>
       </Modal>
+
+      <Modal
+        title="电子签名"
+        open={signModalOpen}
+        onCancel={() => { setSignModalOpen(false); setSigningContractId(null); setSignName('') }}
+        footer={null}
+        width={560}
+      >
+        <Space direction="vertical" style={{ width: '100%' }} size="middle">
+          <div>
+            <div style={{ marginBottom: 8, fontWeight: 500 }}>签署方</div>
+            <Radio.Group
+              value={signParty}
+              onChange={(e) => setSignParty(e.target.value)}
+              options={[
+                { label: '甲方', value: 'party_a' },
+                { label: '乙方', value: 'party_b' },
+              ]}
+            />
+          </div>
+          <div>
+            <div style={{ marginBottom: 8, fontWeight: 500 }}>签署人姓名</div>
+            <Input
+              placeholder="请输入签署人姓名"
+              value={signName}
+              onChange={(e) => setSignName(e.target.value)}
+              style={{ width: '100%' }}
+            />
+          </div>
+          <div>
+            <div style={{ marginBottom: 8, fontWeight: 500 }}>签名区域</div>
+            <SignaturePad onSave={handleSign} />
+          </div>
+        </Space>
+      </Modal>
     </div>
   )
 }
@@ -406,10 +491,21 @@ const ContractDetail: React.FC<{
   onClose: () => void
   onGenerateDraft: (id: number) => void
   onOpenUpload: (record: Contract) => void
+  onOpenSign: (record: Contract) => void
   generatingDraft: boolean
-}> = ({ id, onClose, onGenerateDraft, onOpenUpload, generatingDraft }) => {
+}> = ({ id, onClose, onGenerateDraft, onOpenUpload, onOpenSign, generatingDraft }) => {
   const { data } = useGetContractQuery(id)
   const [updateStatus] = useUpdateContractStatusMutation()
+
+  const handleUpdateStatus = async (id: number, status: ContractStatus) => {
+    try {
+      await updateStatus({ id, status }).unwrap()
+      message.success('状态更新成功')
+    } catch (err: any) {
+      message.error(err?.data?.detail || '状态更新失败')
+    }
+  }
+
   const [deleteAttachment] = useDeleteContractAttachmentMutation()
   const { data: serviceTypesData } = useListServiceTypesQuery({ page_size: 200 })
   const serviceTypeMap = React.useMemo(() => {
@@ -432,16 +528,19 @@ const ContractDetail: React.FC<{
             <PermissionButton permission="contract:update" icon={<FileTextOutlined />} onClick={() => onGenerateDraft(data.id)} loading={generatingDraft}>生成草稿</PermissionButton>
           )}
           {data.status === 'draft' && (
+            <PermissionButton permission="contract:sign" icon={<EditOutlined />} onClick={() => onOpenSign(data)}>电子签名</PermissionButton>
+          )}
+          {data.status === 'draft' && (
             <PermissionButton permission="contract:update" icon={<UploadOutlined />} onClick={() => onOpenUpload(data)}>上传已签附件</PermissionButton>
           )}
           {data.status === 'signed' && (
-            <PermissionButton permission="contract:update" type="primary" onClick={() => updateStatus({ id: data.id, status: 'executing' })}>开始履行</PermissionButton>
+            <PermissionButton permission="contract:update" type="primary" onClick={() => handleUpdateStatus(data.id, 'executing')}>开始履行</PermissionButton>
           )}
           {data.status === 'executing' && (
-            <PermissionButton permission="contract:update" type="primary" onClick={() => updateStatus({ id: data.id, status: 'completed' })}>标记完成</PermissionButton>
+            <PermissionButton permission="contract:update" type="primary" onClick={() => handleUpdateStatus(data.id, 'completed')}>标记完成</PermissionButton>
           )}
           {(data.status === 'draft' || data.status === 'signed' || data.status === 'executing') && (
-            <Popconfirm title="确认终止合同？" onConfirm={() => updateStatus({ id: data.id, status: 'terminated' })}>
+            <Popconfirm title="确认终止合同？" onConfirm={() => handleUpdateStatus(data.id, 'terminated')}>
               <PermissionButton permission="contract:update" danger>终止</PermissionButton>
             </Popconfirm>
           )}
