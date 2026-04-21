@@ -15,7 +15,7 @@ import {
   Table,
   Tabs,
 } from 'antd'
-import { Line, Column, Pie } from '@ant-design/charts'
+import { Line, Column, Pie, Bar } from '@ant-design/charts'
 import dayjs, { Dayjs } from 'dayjs'
 
 import {
@@ -359,10 +359,10 @@ const Analytics: React.FC = () => {
                   <Col span={8}>
                     <Card title="客户属地分布">
                       {customerRegionData.length === 0 ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无数据" /> : (
-                        <Pie
+                        <Bar
                           data={customerRegionData}
-                          angleField="value"
-                          colorField="type"
+                          xField="value"
+                          yField="type"
                           height={260}
                           onReady={(plot) => {
                             plot.on('element:click', (event: any) => {
