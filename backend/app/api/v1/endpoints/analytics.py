@@ -415,7 +415,9 @@ def _build_drilldown_rows(
             query = query.filter(Customer.city.is_(None))
         else:
             query = query.filter(
-                func.coalesce(Customer.city, "") + func.coalesce(Customer.district, "")
+                func.coalesce(Customer.city, "")
+                + func.coalesce(Customer.district, "")
+                + func.coalesce(Customer.street, "")
                 == group_value
             )
         items = query.order_by(Customer.created_at.desc()).all()
@@ -870,7 +872,11 @@ def get_customer_insights(
 
     region_expr = func.coalesce(
         func.nullif(
-            func.trim(func.coalesce(Customer.city, "") + func.coalesce(Customer.district, "")),
+            func.trim(
+                func.coalesce(Customer.city, "")
+                + func.coalesce(Customer.district, "")
+                + func.coalesce(Customer.street, "")
+            ),
             "",
         ),
         "未填写",
