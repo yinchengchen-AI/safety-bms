@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Table, Button, Input, Select, Tag, Space, Popconfirm, message, Drawer, Form, InputNumber, DatePicker, Descriptions, Divider, Modal, Upload } from 'antd'
 import { PermissionButton } from '@/components/auth/PermissionButton'
-import { PlusOutlined, FileTextOutlined, UploadOutlined, DeleteOutlined, StopOutlined } from '@ant-design/icons'
+import { PlusOutlined, FileTextOutlined, UploadOutlined, DeleteOutlined, StopOutlined, EyeOutlined } from '@ant-design/icons'
 import {
   useListContractsQuery, useCreateContractMutation, useUpdateContractMutation, useDeleteContractMutation,
   useUpdateContractStatusMutation, useGetContractQuery,
@@ -9,6 +9,7 @@ import {
   useUploadContractAttachmentFileMutation,
   useUploadContractAttachmentMutation,
   useDeleteContractAttachmentMutation,
+  useLazyGetContractDraftUrlQuery,
 } from '@/store/api/contractsApi'
 import { useListContractTemplatesQuery } from '@/store/api/contractTemplatesApi'
 import { useListCustomersQuery } from '@/store/api/customersApi'
@@ -419,6 +420,23 @@ const ContractDetail: React.FC<{
 }> = ({ id, onClose, onGenerateDraft, onOpenUpload, generatingDraft }) => {
   const { data } = useGetContractQuery(id)
   const [updateStatus] = useUpdateContractStatusMutation()
+  const [getDraftUrl, { isFetching: previewLoading }] = useLazyGetContractDraftUrlQuery()
+  const [previewOpen, setPreviewOpen] = useState(false)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+
+  const handlePreview = async (urlOrId: string | number) => {
+    try {
+      if (typeof urlOrId === 'number') {
+        const result = await getDraftUrl(urlOrId).unwrap()
+        setPreviewUrl(result.url)
+      } else {
+        setPreviewUrl(urlOrId)
+      }
+      setPreviewOpen(true)
+    } catch (err: any) {
+      message.error(err?.data?.detail || '获取预览链接失败')
+    }
+  }
 
   const handleUpdateStatus = async (id: number, status: ContractStatus) => {
     try {
@@ -490,7 +508,7 @@ const ContractDetail: React.FC<{
         <Descriptions.Item label="合同草稿">
           {latestDraft ? (
             <Space>
-              <Button type="link" onClick={() => window.open(latestDraft.file_url, '_blank')}>下载草稿</Button>
+              <Button type="link" icon={<EyeOutlined />} onClick={() => handlePreview(latestDraft.file_url)}>预览草稿</Button>
               <span style={{ color: '#999', fontSize: 12 }}>生成于 {formatDateTime(latestDraft.uploaded_at)}</span>
             </Space>
           ) : '未生成'}
@@ -500,7 +518,7 @@ const ContractDetail: React.FC<{
             <Space direction="vertical" style={{ width: '100%' }}>
               {signedAttachments.map((att: ContractAttachment) => (
                 <Space key={att.id}>
-                  <Button type="link" onClick={() => window.open(att.file_url, '_blank')}>{att.file_name}</Button>
+                  <Button type="link" icon={<EyeOutlined />} onClick={() => handlePreview(att.file_url)}>{att.file_name}</Button>
                   <span style={{ color: '#999', fontSize: 12 }}>上传于 {formatDateTime(att.uploaded_at)}</span>
                   {data.status === 'draft' && (
                     <Popconfirm title="确认删除？" onConfirm={async () => {
@@ -520,6 +538,20 @@ const ContractDetail: React.FC<{
           ) : '未上传'}
         </Descriptions.Item>
       </Descriptions>
+
+      <Modal
+        title="文件预览"
+        open={previewOpen}
+        onCancel={() => { setPreviewOpen(false); setPreviewUrl(null) }}
+        footer={null}
+        width={900}
+      >
+        {previewLoading ? (
+          <div style={{ textAlign: 'center', padding: 40 }}>加载中...</div>
+        ) : previewUrl ? (
+          <iframe src={previewUrl} style={{ width: '100%', height: 600, border: 'none' }} />
+        ) : null}
+      </Modal>
     </Drawer>
   )
 }
