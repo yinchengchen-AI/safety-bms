@@ -45,6 +45,19 @@ router = APIRouter(prefix="/contracts", tags=["合同管理"])
 logger = logging.getLogger(__name__)
 
 
+def _get_contract_for_draft(db: Session, contract_id: int) -> Contract | None:
+    """重新查询合同并 eager-load 渲染草稿所需的关联对象"""
+    return (
+        db.query(Contract)
+        .options(
+            joinedload(Contract.customer),
+            joinedload(Contract.service_type_obj),
+        )
+        .filter(Contract.id == contract_id, Contract.is_deleted == False)
+        .first()
+    )
+
+
 def _enrich_contract_out(contract, out: ContractOut) -> ContractOut:
     out.customer_name = contract.customer.name if contract.customer else None
     if contract.service_type_obj:
@@ -164,45 +177,48 @@ def create_contract(
     contract = crud_contract.create(db, obj_in=body, created_by=current_user.id)
     # 自动生成合同草稿（失败不阻断创建）
     try:
-        if contract.template_id:
-            template = (
-                db.query(ContractTemplate)
-                .filter(ContractTemplate.id == contract.template_id)
-                .first()
-            )
-            if template and template.file_url:
-                draft_object_name = render_contract_draft(contract, template.file_url)
-                crud_contract.update(
-                    db, db_obj=contract, obj_in={"draft_doc_url": draft_object_name}
+        # 重新 eager-load 查询，确保 customer / service_type_obj 等关联字段完整加载
+        contract_full = _get_contract_for_draft(db, contract.id)
+        if contract_full:
+            if contract_full.template_id:
+                template = (
+                    db.query(ContractTemplate)
+                    .filter(ContractTemplate.id == contract_full.template_id)
+                    .first()
                 )
-                db.add(
-                    ContractAttachment(
-                        contract_id=contract.id,
-                        file_name=draft_object_name.rsplit("/", 1)[-1],
-                        file_url=draft_object_name,
-                        file_type="draft",
-                        uploaded_by=current_user.id,
+                if template and template.file_url:
+                    draft_object_name = render_contract_draft(contract_full, template.file_url)
+                    crud_contract.update(
+                        db, db_obj=contract, obj_in={"draft_doc_url": draft_object_name}
                     )
-                )
-                db.commit()
-                db.refresh(contract)
-        else:
-            standard_object_name = render_standard_contract_draft(contract, db)
-            if standard_object_name:
-                crud_contract.update(
-                    db, db_obj=contract, obj_in={"standard_doc_url": standard_object_name}
-                )
-                db.add(
-                    ContractAttachment(
-                        contract_id=contract.id,
-                        file_name=standard_object_name.rsplit("/", 1)[-1],
-                        file_url=standard_object_name,
-                        file_type="draft",
-                        uploaded_by=current_user.id,
+                    db.add(
+                        ContractAttachment(
+                            contract_id=contract.id,
+                            file_name=draft_object_name.rsplit("/", 1)[-1],
+                            file_url=draft_object_name,
+                            file_type="draft",
+                            uploaded_by=current_user.id,
+                        )
                     )
-                )
-                db.commit()
-                db.refresh(contract)
+                    db.commit()
+                    db.refresh(contract)
+            else:
+                standard_object_name = render_standard_contract_draft(contract_full, db)
+                if standard_object_name:
+                    crud_contract.update(
+                        db, db_obj=contract, obj_in={"standard_doc_url": standard_object_name}
+                    )
+                    db.add(
+                        ContractAttachment(
+                            contract_id=contract.id,
+                            file_name=standard_object_name.rsplit("/", 1)[-1],
+                            file_url=standard_object_name,
+                            file_type="draft",
+                            uploaded_by=current_user.id,
+                        )
+                    )
+                    db.commit()
+                    db.refresh(contract)
     except Exception as e:
         logger.warning("合同草稿自动生成失败 contract_id=%s: %s", contract.id, e)
     result = ContractOut.model_validate(contract)
@@ -400,16 +416,23 @@ def generate_contract_draft(
     ):
         raise BusinessError("已签订/已完成/已终止的合同不可修改")
 
-    if contract.template_id:
+    # eager-load 关联对象，确保草稿渲染时字段完整
+    contract_full = _get_contract_for_draft(db, contract_id)
+    if not contract_full:
+        raise NotFoundError("合同")
+
+    if contract_full.template_id:
         template = (
-            db.query(ContractTemplate).filter(ContractTemplate.id == contract.template_id).first()
+            db.query(ContractTemplate)
+            .filter(ContractTemplate.id == contract_full.template_id)
+            .first()
         )
         if not template or not template.file_url:
             raise BusinessError("模板文件不存在")
-        draft_object_name = render_contract_draft(contract, template.file_url)
+        draft_object_name = render_contract_draft(contract_full, template.file_url)
         crud_contract.update(db, db_obj=contract, obj_in={"draft_doc_url": draft_object_name})
     else:
-        standard_object_name = render_standard_contract_draft(contract, db)
+        standard_object_name = render_standard_contract_draft(contract_full, db)
         if not standard_object_name:
             raise BusinessError("未找到默认合同模板，无法生成标准合同草稿")
         crud_contract.update(db, db_obj=contract, obj_in={"standard_doc_url": standard_object_name})
