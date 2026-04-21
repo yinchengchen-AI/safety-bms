@@ -13,9 +13,18 @@ from app.schemas.service import (
 
 
 class CRUDServiceOrder(CRUDBase[ServiceOrder, ServiceOrderCreate, ServiceOrderUpdate]):
+    def _generate_order_no(self) -> str:
+        import random
+        from datetime import UTC, datetime
+
+        date_str = datetime.now(UTC).strftime("%Y%m%d")
+        rand = random.randint(1000, 9999)
+        return f"GD{date_str}{rand}"
+
     def create(self, db: Session, *, obj_in: ServiceOrderCreate) -> ServiceOrder:
         items = obj_in.items
         data = obj_in.model_dump(exclude={"items"})
+        data["order_no"] = self._generate_order_no()
         db_obj = ServiceOrder(**data)
         db.add(db_obj)
         db.flush()

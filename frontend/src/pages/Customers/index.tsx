@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react'
 import {
   Table, Button, Input, Select, Tag, Space, Popconfirm, message, Drawer, Form, Descriptions,
-  Cascader, Modal, List, Timeline, Switch, DatePicker, Divider, Empty,
+  Cascader, Modal, List, Timeline, Switch, DatePicker, Divider, Empty, Tabs,
 } from 'antd'
 import { PlusOutlined, EditOutlined, DeleteOutlined, UploadOutlined } from '@ant-design/icons'
 import {
@@ -9,7 +9,11 @@ import {
   useGetCustomerQuery, useUpdateCustomerMutation, useAddContactMutation,
   useAddFollowUpMutation, useListFollowUpsQuery, useImportCustomersMutation,
 } from '@/store/api/customersApi'
-import { CustomerStatusLabels, formatDate, formatDateTime } from '@/utils/constants'
+import { useListContractsQuery } from '@/store/api/contractsApi'
+import { useListServiceOrdersQuery } from '@/store/api/servicesApi'
+import { useListInvoicesQuery } from '@/store/api/invoicesApi'
+import { useListPaymentsQuery } from '@/store/api/paymentsApi'
+import { CustomerStatusLabels, formatDate, formatDateTime, ContractStatusLabels, ServiceOrderStatusLabels, InvoiceStatusLabels, InvoiceTypeLabels, PaymentMethodLabels, formatAmount } from '@/utils/constants'
 import { hangzhouRegionOptions, getFullAddress } from '@/utils/hangzhouRegions'
 import type { CustomerListItem, CustomerStatus } from '@/types'
 import dayjs from 'dayjs'
@@ -298,32 +302,56 @@ const CustomerDetail: React.FC<{ id: number; onClose: () => void }> = ({ id, onC
     }
   }
 
-  return (
-    <Drawer title="客户详情" open width={800} onClose={onClose} loading={isLoading}>
-      {data && (
-        <div>
-          {/* 基本信息 */}
-          <Descriptions column={2} bordered size="small">
-            <Descriptions.Item label="公司名称" span={2}>{data.name}</Descriptions.Item>
-            <Descriptions.Item label="统一社会信用代码">{data.credit_code}</Descriptions.Item>
-            <Descriptions.Item label="行业">{data.industry}</Descriptions.Item>
-            <Descriptions.Item label="规模">{data.scale}</Descriptions.Item>
-            <Descriptions.Item label="状态"><Tag color={statusColors[data.status]}>{CustomerStatusLabels[data.status]}</Tag></Descriptions.Item>
-            <Descriptions.Item label="网站" span={2}>{data.website}</Descriptions.Item>
-            <Descriptions.Item label="属地" span={2}>{[data.province, data.city, data.district, data.street].filter(Boolean).join('')}</Descriptions.Item>
-            <Descriptions.Item label="地址" span={2}>{data.address}</Descriptions.Item>
-            <Descriptions.Item label="联系人">{data.contact_name}</Descriptions.Item>
-            <Descriptions.Item label="联系方式">{data.contact_phone}</Descriptions.Item>
-            <Descriptions.Item label="备注" span={2}>{data.remark}</Descriptions.Item>
-          </Descriptions>
+  // 关联数据查询
+  const { data: contractsData, isLoading: contractsLoading } = useListContractsQuery({ customer_id: id, page_size: 10 })
+  const { data: servicesData, isLoading: servicesLoading } = useListServiceOrdersQuery({ customer_id: id, page_size: 10 })
+  const { data: invoicesData, isLoading: invoicesLoading } = useListInvoicesQuery({ customer_id: id, page_size: 10 })
+  const { data: paymentsData, isLoading: paymentsLoading } = useListPaymentsQuery({ customer_id: id, page_size: 10 })
 
-          <Divider orientation="left">联系人</Divider>
+  const contractColumns = useMemo(() => [
+    { title: '合同编号', dataIndex: 'contract_no', key: 'contract_no' },
+    { title: '标题', dataIndex: 'title', key: 'title' },
+    { title: '金额', dataIndex: 'total_amount', key: 'total_amount', render: (v: number) => formatAmount(v) },
+    { title: '状态', dataIndex: 'status', key: 'status', render: (s: string) => <Tag>{ContractStatusLabels[s] || s}</Tag> },
+    { title: '签订日期', dataIndex: 'sign_date', key: 'sign_date', render: (d: string) => formatDate(d) },
+  ], [])
+
+  const serviceColumns = useMemo(() => [
+    { title: '工单编号', dataIndex: 'order_no', key: 'order_no' },
+    { title: '标题', dataIndex: 'title', key: 'title' },
+    { title: '服务类型', dataIndex: 'service_type_name', key: 'service_type_name' },
+    { title: '负责人', dataIndex: 'assignee_name', key: 'assignee_name' },
+    { title: '状态', dataIndex: 'status', key: 'status', render: (s: string) => <Tag>{ServiceOrderStatusLabels[s] || s}</Tag> },
+    { title: '计划开始', dataIndex: 'planned_start', key: 'planned_start', render: (d: string) => formatDate(d) },
+  ], [])
+
+  const invoiceColumns = useMemo(() => [
+    { title: '发票编号', dataIndex: 'invoice_no', key: 'invoice_no' },
+    { title: '类型', dataIndex: 'invoice_type', key: 'invoice_type', render: (t: string) => InvoiceTypeLabels[t] || t },
+    { title: '金额', dataIndex: 'amount', key: 'amount', render: (v: number) => formatAmount(v) },
+    { title: '状态', dataIndex: 'status', key: 'status', render: (s: string) => <Tag>{InvoiceStatusLabels[s] || s}</Tag> },
+    { title: '开票日期', dataIndex: 'invoice_date', key: 'invoice_date', render: (d: string) => formatDate(d) },
+  ], [])
+
+  const paymentColumns = useMemo(() => [
+    { title: '收款编号', dataIndex: 'payment_no', key: 'payment_no' },
+    { title: '金额', dataIndex: 'amount', key: 'amount', render: (v: number) => formatAmount(v) },
+    { title: '方式', dataIndex: 'payment_method', key: 'payment_method', render: (m: string) => PaymentMethodLabels[m] || m },
+    { title: '收款日期', dataIndex: 'payment_date', key: 'payment_date', render: (d: string) => formatDate(d) },
+  ], [])
+
+  const detailTabItems = useMemo(() => [
+    {
+      key: 'contacts',
+      label: '联系人',
+      children: (
+        <div>
           <div style={{ marginBottom: 12 }}>
             <Button type="dashed" icon={<PlusOutlined />} size="small" onClick={() => setContactModalOpen(true)}>
               添加联系人
             </Button>
           </div>
-          {data.contacts && data.contacts.length > 0 ? (
+          {data?.contacts && data.contacts.length > 0 ? (
             <List
               size="small"
               bordered
@@ -343,8 +371,14 @@ const CustomerDetail: React.FC<{ id: number; onClose: () => void }> = ({ id, onC
           ) : (
             <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无联系人" />
           )}
-
-          <Divider orientation="left">跟进记录</Divider>
+        </div>
+      ),
+    },
+    {
+      key: 'followUps',
+      label: '跟进记录',
+      children: (
+        <div>
           <div style={{ marginBottom: 12 }}>
             <Button type="dashed" icon={<PlusOutlined />} size="small" onClick={() => setFollowUpModalOpen(true)}>
               添加跟进记录
@@ -371,6 +405,91 @@ const CustomerDetail: React.FC<{ id: number; onClose: () => void }> = ({ id, onC
           ) : (
             <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无跟进记录" />
           )}
+        </div>
+      ),
+    },
+    {
+      key: 'contracts',
+      label: `合同 (${contractsData?.total ?? 0})`,
+      children: (
+        <Table
+          rowKey="id"
+          columns={contractColumns}
+          dataSource={contractsData?.items}
+          loading={contractsLoading}
+          pagination={false}
+          size="small"
+          locale={{ emptyText: '暂无合同' }}
+        />
+      ),
+    },
+    {
+      key: 'services',
+      label: `服务工单 (${servicesData?.total ?? 0})`,
+      children: (
+        <Table
+          rowKey="id"
+          columns={serviceColumns}
+          dataSource={servicesData?.items}
+          loading={servicesLoading}
+          pagination={false}
+          size="small"
+          locale={{ emptyText: '暂无服务工单' }}
+        />
+      ),
+    },
+    {
+      key: 'invoices',
+      label: `发票 (${invoicesData?.total ?? 0})`,
+      children: (
+        <Table
+          rowKey="id"
+          columns={invoiceColumns}
+          dataSource={invoicesData?.items}
+          loading={invoicesLoading}
+          pagination={false}
+          size="small"
+          locale={{ emptyText: '暂无发票' }}
+        />
+      ),
+    },
+    {
+      key: 'payments',
+      label: `收款 (${paymentsData?.total ?? 0})`,
+      children: (
+        <Table
+          rowKey="id"
+          columns={paymentColumns}
+          dataSource={paymentsData?.items}
+          loading={paymentsLoading}
+          pagination={false}
+          size="small"
+          locale={{ emptyText: '暂无收款' }}
+        />
+      ),
+    },
+  ], [data, followUps, followUpsLoading, contractsData, contractsLoading, servicesData, servicesLoading, invoicesData, invoicesLoading, paymentsData, paymentsLoading, contractColumns, serviceColumns, invoiceColumns, paymentColumns])
+
+  return (
+    <Drawer title="客户详情" open width={800} onClose={onClose} loading={isLoading}>
+      {data && (
+        <div>
+          {/* 基本信息 */}
+          <Descriptions column={2} bordered size="small">
+            <Descriptions.Item label="公司名称" span={2}>{data.name}</Descriptions.Item>
+            <Descriptions.Item label="统一社会信用代码">{data.credit_code}</Descriptions.Item>
+            <Descriptions.Item label="行业">{data.industry}</Descriptions.Item>
+            <Descriptions.Item label="规模">{data.scale}</Descriptions.Item>
+            <Descriptions.Item label="状态"><Tag color={statusColors[data.status]}>{CustomerStatusLabels[data.status]}</Tag></Descriptions.Item>
+            <Descriptions.Item label="网站" span={2}>{data.website}</Descriptions.Item>
+            <Descriptions.Item label="属地" span={2}>{[data.province, data.city, data.district, data.street].filter(Boolean).join('')}</Descriptions.Item>
+            <Descriptions.Item label="地址" span={2}>{data.address}</Descriptions.Item>
+            <Descriptions.Item label="联系人">{data.contact_name}</Descriptions.Item>
+            <Descriptions.Item label="联系方式">{data.contact_phone}</Descriptions.Item>
+            <Descriptions.Item label="备注" span={2}>{data.remark}</Descriptions.Item>
+          </Descriptions>
+
+          <Tabs items={detailTabItems} style={{ marginTop: 16 }} />
         </div>
       )}
 

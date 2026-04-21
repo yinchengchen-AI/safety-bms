@@ -6,6 +6,7 @@ export const usersApi = baseApi.injectEndpoints({
     // Auth
     login: builder.mutation<TokenResponse, LoginRequest>({
       query: (body) => ({ url: '/auth/login', method: 'POST', body }),
+      invalidatesTags: ['User'],
     }),
     logout: builder.mutation<{ message: string }, void>({
       query: () => ({ url: '/auth/logout', method: 'POST' }),

@@ -11,7 +11,6 @@ import type { Dayjs } from 'dayjs'
 import { useListServiceTypesQuery } from '@/store/api/serviceTypesApi'
 
 interface ServiceFormValues {
-  order_no: string
   contract_id: number
   service_type: number
   title: string
@@ -163,7 +162,6 @@ const Services: React.FC = () => {
         </Space>
       }>
         <Form form={form} layout="vertical" onFinish={handleCreate}>
-          <Form.Item name="order_no" label="工单编号" rules={[{ required: true }]}><Input /></Form.Item>
           <Form.Item name="contract_id" label="关联合同" rules={[{ required: true }]}>
             <Select showSearch optionFilterProp="label"
               options={activeContracts.map(c => ({ value: c.id, label: `${c.contract_no} - ${c.title}` }))} />
@@ -185,7 +183,9 @@ const Services: React.FC = () => {
         </Space>
       }>
         <Form form={editForm} layout="vertical" onFinish={handleEdit}>
-          <Form.Item name="order_no" label="工单编号" rules={[{ required: true }]}><Input /></Form.Item>
+          <Form.Item name="order_no" label="工单编号">
+            <Input disabled style={{ color: 'rgba(0,0,0,0.65)', background: '#fafafa', cursor: 'not-allowed' }} />
+          </Form.Item>
           <Form.Item name="contract_id" label="关联合同" rules={[{ required: true }]}>
             <Select showSearch optionFilterProp="label"
               options={activeContracts.map(c => ({ value: c.id, label: `${c.contract_no} - ${c.title}` }))} />

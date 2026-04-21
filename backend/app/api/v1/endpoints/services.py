@@ -79,15 +79,18 @@ def list_service_orders(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=200),
     contract_id: int | None = None,
+    customer_id: int | None = None,
     assignee_id: int | None = None,
     status: ServiceOrderStatus | None = None,
     current_user: User = Depends(require_permissions(PermissionCode.SERVICE_READ)),
     db: Session = Depends(get_db),
 ):
     skip = (page - 1) * page_size
-    query = db.query(ServiceOrder)
+    query = db.query(ServiceOrder).join(Contract, ServiceOrder.contract_id == Contract.id)
     if contract_id:
         query = query.filter(ServiceOrder.contract_id == contract_id)
+    if customer_id:
+        query = query.filter(Contract.customer_id == customer_id)
     if assignee_id:
         query = query.filter(ServiceOrder.assignee_id == assignee_id)
     if status:
@@ -185,7 +188,10 @@ def create_service_order(
                 title="新服务工单分配",
                 content=f"您被分配了新的服务工单：{order.title}。",
             )
-    return order
+    order_full = _get_service_order_with_relations(db, order.id)
+    result = ServiceOrderOut.model_validate(order_full)
+    _enrich_service_order_out(order_full, result)
+    return result
 
 
 @router.get("/{order_id}", response_model=ServiceOrderOut)

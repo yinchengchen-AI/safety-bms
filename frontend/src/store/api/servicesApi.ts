@@ -3,7 +3,7 @@ import type { ServiceOrder, ServiceOrderCreate, PageResponse, ServiceOrderStatus
 
 export const servicesApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
-    listServiceOrders: builder.query<PageResponse<ServiceOrder>, { page?: number; page_size?: number; contract_id?: number; assignee_id?: number; status?: ServiceOrderStatus; keyword?: string }>({
+    listServiceOrders: builder.query<PageResponse<ServiceOrder>, { page?: number; page_size?: number; contract_id?: number; customer_id?: number; assignee_id?: number; status?: ServiceOrderStatus; keyword?: string }>({
       query: (params) => ({ url: '/services', params }),
       providesTags: ['Service'],
     }),

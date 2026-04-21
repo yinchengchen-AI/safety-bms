@@ -46,7 +46,6 @@ class ServiceReportOut(BaseModel):
 
 
 class ServiceOrderBase(BaseModel):
-    order_no: str
     contract_id: int
     title: str
     service_type: int
@@ -76,6 +75,7 @@ class ServiceOrderStatusUpdate(BaseModel):
 
 class ServiceOrderOut(ServiceOrderBase):
     id: int
+    order_no: str
     status: ServiceOrderStatus
     actual_start: date | None = None
     actual_end: date | None = None
