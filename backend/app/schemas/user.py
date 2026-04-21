@@ -9,7 +9,7 @@ def _presign_avatar_url(v: str | None) -> str | None:
         try:
             from app.services.minio_service import minio_service
 
-            return minio_service.get_presigned_url(v)
+            return minio_service.get_presigned_url(v, inline=True)
         except Exception:
             return v
     return v

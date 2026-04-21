@@ -67,15 +67,21 @@ class MinIOService:
         except S3Error as e:
             raise HTTPException(status_code=500, detail=f"文件上传失败: {str(e)}") from e
 
-    def get_presigned_url(self, object_name: str, expires_seconds: int = 3600) -> str:
+    def get_presigned_url(
+        self, object_name: str, expires_seconds: int = 3600, inline: bool = False
+    ) -> str:
         """生成预签名下载URL，通过 nginx /minio/ 代理访问"""
         from datetime import timedelta
 
         try:
+            response_headers = None
+            if inline:
+                response_headers = {"response-content-disposition": "inline"}
             url = self.client.presigned_get_object(
                 self.bucket,
                 object_name,
                 expires=timedelta(seconds=expires_seconds),
+                response_headers=response_headers,
             )
             # 如果配置了公网端点，替换为外部可访问的地址
             # 例如 nginx 代理 http://example.com/minio/ → MinIO，并保持 Host: minio:9000 头

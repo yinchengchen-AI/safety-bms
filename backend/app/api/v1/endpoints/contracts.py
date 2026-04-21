@@ -69,12 +69,14 @@ def _enrich_contract_out(contract, out: ContractOut) -> ContractOut:
         out.service_type_code = contract.service_type_obj.code
     if contract.standard_doc_url:
         try:
-            out.standard_doc_url = minio_service.get_presigned_url(contract.standard_doc_url)
+            out.standard_doc_url = minio_service.get_presigned_url(
+                contract.standard_doc_url, inline=True
+            )
         except Exception:
             out.standard_doc_url = None
     for att in out.attachments:
         with contextlib.suppress(Exception):
-            att.file_url = minio_service.get_presigned_url(att.file_url)
+            att.file_url = minio_service.get_presigned_url(att.file_url, inline=True)
     return out
 
 
@@ -406,7 +408,9 @@ def get_contract_draft_url(
         raise PermissionDeniedError()
     if not contract.draft_doc_url and not contract.standard_doc_url:
         raise NotFoundError("合同草稿")
-    url = minio_service.get_presigned_url(contract.draft_doc_url or contract.standard_doc_url)
+    url = minio_service.get_presigned_url(
+        contract.draft_doc_url or contract.standard_doc_url, inline=True
+    )
     return {"url": url}
 
 

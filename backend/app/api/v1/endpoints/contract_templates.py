@@ -74,7 +74,7 @@ def get_template_download_url(
     template = crud_contract_template.get(db, id=template_id)
     if not template or not template.file_url:
         raise NotFoundError("模板文件")
-    url = minio_service.get_presigned_url(template.file_url)
+    url = minio_service.get_presigned_url(template.file_url, inline=True)
     return {"url": url}
 
 
